@@ -24,10 +24,10 @@ void setup() {
 void loop() {
   Serial.setTimeout(16000);
 
-  byte command[4];
+  byte command[130];
   int byteCount;
   while (1) {
-    byteCount = readCommand(command, 4);
+    byteCount = readCommand(command, 130);
     if (byteCount <= 0) break;
     performCommand(command, byteCount);
   }
