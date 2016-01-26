@@ -4,7 +4,7 @@
 /* SPI Test
  * Allows manual interaction with an SPI interface via the serial link for testing purposes.
  * 
- * Simply enter up to 4 hexadecimal Bytes and a newline and see the response.
+ * Simply enter up to 16 hexadecimal Bytes and a newline and see the response.
  */
 
 
@@ -22,12 +22,10 @@ void setup() {
 }
 
 void loop() {
-  Serial.setTimeout(16000);
-
-  byte command[4];
+  byte command[16];
   int byteCount;
   while (1) {
-    byteCount = readCommand(command, 4);
+    byteCount = readCommand(command, 16);
     if (byteCount <= 0) break;
     performCommand(command, byteCount);
   }
