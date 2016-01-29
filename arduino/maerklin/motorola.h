@@ -21,7 +21,7 @@ public:
   static constexpr uint8_t BitCountGap = 6;
   static constexpr uint8_t BitCountWait = 22;
 
-//  static Message oldTrainMessage(uint8_t address, bool function, uint8_t speedLevel);
+  static Message oldTrainMessage(uint8_t address, bool function, uint8_t speedLevel);
 //  static Message newTrainMessageDirection(uint8_t address, bool function, int8_t speed);
 //  static Message newTrainMessageFunction(uint8_t address, bool function, int8_t speed, uint8_t nFunction, bool on);
 //  static Message switchMessage(uint8_t address,);

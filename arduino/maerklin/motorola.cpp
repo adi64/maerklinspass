@@ -1,5 +1,63 @@
 #include "motorola.h"
 
+uint8_t addressToLineBits(int8_t address)
+{
+    // fixes for weird encoding
+    if (address == 80) address = 0;
+    if (address < 0 || address > 80) address = 81;
+
+    uint8_t encodedAddress = 0;
+
+    uint8_t dividend = address;
+    uint8_t quotient = 0;
+    uint8_t remainder = 0;
+
+    uint8_t trits[] = {
+        0b00, // 0
+        0b11, // 1
+        0b01  // "open"
+    };
+
+    for(uint8_t i=0; i<4; i++)
+    {
+        quotient = dividend / 3;
+        remainder = dividend % 3;
+
+        dividend = quotient;
+
+        encodedAddress |= trits[remainder] << (2*i);
+    }
+
+    return encodedAddress;
+}
+
+uint8_t speedToLineBits(uint8_t speed)
+{
+    if (speed > 15)
+    {
+        speed = 15;
+    }
+    uint8_t encodedSpeed = 0;
+
+    for(uint8_t i = 0; i < 4; i++)
+    {
+      encodedSpeed |= ((speed & (0x1 << i))? 0b11 : 0b00) << (2*i);
+    }
+
+    return encodedSpeed;
+}
+
+Motorola::Message Motorola::oldTrainMessage(uint8_t address, bool function, uint8_t speedLevel)
+{
+  Motorola::Message message = 0;
+
+  message |= ((uint32_t) speedToLineBits(speedLevel)) << 10;
+  message |= (function? 0b11 : 0b00) << 8;
+  message |= ((uint32_t) addressToLineBits(address)) << 0;
+  
+  return message;
+}
+
 Motorola::Motorola()
 : m_msgEnabled(0x00)
 , m_msgSpeed(0x00)
