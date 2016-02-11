@@ -14,10 +14,10 @@ void setup()
 //  address |= digitalRead(PinAdr3)? 0x80 : 0x00;
   uint16_t mask = 0x7F0; //take 16 addresses
 
-  CAN::inst().start(address, mask);
-  CAN::inst().setMsgHandler(&msgHandler);
-  CAN::inst().setRTRHandler(&rtrHandler);
-  CAN::inst().setErrorHandler(&errorHandler);
+  CAN::start(address, mask);
+  CAN::setMsgHandler(&msgHandler);
+  CAN::setRTRHandler(&rtrHandler);
+  CAN::setErrorHandler(&errorHandler);
   
   Serial.begin(9600);
 }
@@ -26,12 +26,15 @@ uint8_t addr = 0;
 
 void loop()
 {
-  CAN::inst().send(addr, millis(), 108);
+  CAN::send(addr, millis(), 108);
   addr = (addr + 1) % 16;
 
-  int ts = millis();
-  while(millis() - ts < 1000)
-    CAN::inst().processEvents();
+  uint32_t ts = millis(); //TODO handle millis() overflow between ts and now
+  while(millis() - ts < 5000)
+  {
+    CAN::processEvents();
+    delay(1000);
+  }
 }
 
 void msgHandler(CAN::CANAddress address, uint32_t timestamp, uint32_t duration)
