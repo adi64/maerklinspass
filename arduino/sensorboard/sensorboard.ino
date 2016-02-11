@@ -31,10 +31,10 @@ void setup()
 //  address |= digitalRead(PinAdr3)? 0x80 : 0x00;
   uint16_t mask = 0x7F0; //take 16 addresses
 
-  CAN::inst().start(address, mask);
-  CAN::inst().setMsgHandler(&msgHandler);
-  CAN::inst().setRTRHandler(&rtrHandler);
-  CAN::inst().setErrorHandler(&errorHandler);
+  CAN::start(address, mask);
+  CAN::setMsgHandler(&msgHandler);
+  CAN::setRTRHandler(&rtrHandler);
+  CAN::setErrorHandler(&errorHandler);
 
   pinMode(MultiplexInputA, INPUT);
   pinMode(MultiplexInputB, INPUT);
@@ -51,12 +51,6 @@ uint8_t inputAddr = 0;
 
 void loop()
 {
-//  CAN::inst().send(addr, millis(), 108);
-//  addr = (addr + 1) % 16;
-//
-//  int ts = millis();
-//  while(millis() - ts < 1000)
-//    CAN::inst().processEvents();
 
 for(inputAddr = 0; inputAddr < 16; inputAddr++)
 {
@@ -98,13 +92,16 @@ for(inputAddr = 0; inputAddr < 16; inputAddr++)
         inputStates &= ~inputAddrMask;  
 
         // Send message with timestamps[inputAddr] and duration
+	CAN::inst().send(inputAddr, timestamps[inputAddr], duration);
 
         // reset timestamp for debounceOut
         timestamps[inputAddr] = now;
       }
     }
   }
- 
+
+  CAN::inst().processEvents();
+
 }
 
 

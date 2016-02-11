@@ -21,35 +21,34 @@ public:
   static constexpr int PinMOSI = 11;
   static constexpr int PinSCK = 13;
 
-  static CAN inst();
+//  static CAN inst();
 
-  void start(CANAddress address, CANAddress mask);
-  void setMsgHandler(CANMsgHandler * handler);
-  void setRTRHandler(CANRTRHandler * handler);
-  void setErrorHandler(CANErrorHandler * handler);
-  void send(CANAddress address, uint32_t timestamp, uint32_t duration);
-  void sendRTR(CANAddress address);
-  bool pendingTransmission();
+  static void start(CANAddress address, CANAddress mask);
+  static void setMsgHandler(CANMsgHandler * handler);
+  static void setRTRHandler(CANRTRHandler * handler);
+  static void setErrorHandler(CANErrorHandler * handler);
+  static void send(CANAddress address, uint32_t timestamp, uint32_t duration);
+  static void sendRTR(CANAddress address);
+  static bool pendingTransmission();
 
-  void processEvents(byte eventMask = 0xFF);
+  static void processEvents(byte eventMask = 0xFF);
 
-  void onCANEvent();
-  
-  CAN();
-  
-private:
-  void canCommand(byte * command, int length);
+  static void onCANEvent();
 
 private:
-  CANAddress m_address;
-  CANAddress m_mask;
+  CAN() = default;
+  static void canCommand(byte * command, int length);
 
-  volatile bool m_transmitPending;
-  volatile byte m_eventsPending;
-  volatile byte m_errorsPending;
+private:
+  static CAN::CANAddress m_address;
+  static CAN::CANAddress m_mask;
 
-  CANMsgHandler * m_msgHandler;
-  CANRTRHandler * m_rtrHandler;
-  CANErrorHandler * m_errorHandler;
+  static volatile bool m_transmitPending;
+  static volatile byte m_eventsPending;
+  static volatile byte m_errorsPending;
+
+  static CANMsgHandler * m_msgHandler;
+  static CANRTRHandler * m_rtrHandler;
+  static CANErrorHandler * m_errorHandler;
 };
 
