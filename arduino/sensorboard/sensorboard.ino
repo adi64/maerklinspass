@@ -72,11 +72,11 @@ for(inputAddr = 0; inputAddr < 16; inputAddr++)
       Serial.print(now);
       Serial.print(" ");
       Serial.println(0);
-
-      CAN::send(inputAddr, timestamps[inputAddr], 0);
-      
+            
       timestamps[inputAddr] = now;
       inputStates |= inputAddrMask;
+
+      CAN::send(inputAddr, timestamps[inputAddr], 0);
     }
   }
   else
