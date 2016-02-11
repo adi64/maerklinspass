@@ -47,6 +47,19 @@ uint8_t speedToLineBits(uint8_t speed)
     return encodedSpeed;
 }
 
+uint8_t switchStateToLineBits(uint8_t switchAddress, bool state)
+{
+  uint8_t encodedState = 0;
+  
+  for(int i = 0; i < 3; ++i)
+  {
+    encodedState |= ((switchAddress & (0x1 << i))? 0b11 : 0b00) << (2*i);
+  }
+  encodedState |= (state? 0b11 : 0b00) << 6;
+
+  return encodedState;
+}
+
 Motorola::Message Motorola::oldTrainMessage(uint8_t address, bool function, uint8_t speedLevel)
 {
   Motorola::Message message = 0;
@@ -55,6 +68,16 @@ Motorola::Message Motorola::oldTrainMessage(uint8_t address, bool function, uint
   message |= (function? 0b11 : 0b00) << 8;
   message |= ((uint32_t) addressToLineBits(address)) << 0;
   
+  return message;
+}
+
+Motorola::Message Motorola::switchMessage(uint8_t decoderAddress, uint8_t switchAddress, bool state)
+{
+  Motorola::Message message = 0;
+
+  message |= ((uint32_t) switchStateToLineBits(switchAddress, state)) << 10;
+  message |= ((uint32_t) addressToLineBits(decoderAddress)) << 0;
+
   return message;
 }
 
@@ -72,7 +95,8 @@ Motorola::Motorola()
 
 void Motorola::start()
 {
-  noInterrupts();
+  cli();
+  
   m_currentMsgNumber = 0;
   loadNextMessage();
   m_state = false;
@@ -86,25 +110,48 @@ void Motorola::start()
   TIFR1 = 0;
   TCNT1  = 0;
   m_running = true;
-  interrupts();
+
+  sei();
   digitalWrite(PinGo, LOW);
 }
 
-Motorola::Message & Motorola::message(uint8_t n)
+void Motorola::setMessage(uint8_t n, Message message)
+{
+  uint8_t SaveSREG = SREG;
+  cli(); // clear interrupt flag
+
+  if(n < MessageBufferSize)
+  {
+    m_msgBuffer[n] = message;
+  }
+
+  SREG = SaveSREG; // restore interrupt flag
+}
+Motorola::Message Motorola::getMessage(uint8_t n)
 {
   if(n < MessageBufferSize)
   {
     return m_msgBuffer[n];
   }
-  return m_dummyMsg;
+  return IdleMessage;
 }
 void Motorola::enableMessage(uint8_t n)
 {
+  uint8_t SaveSREG = SREG;
+  cli(); // clear interrupt flag
+
   m_msgEnabled |= (0x1 << n);
+
+  SREG = SaveSREG; // restore interrupt flag
 }
 void Motorola::disableMessage(uint8_t n)
 {
+  uint8_t SaveSREG = SREG;
+  cli(); // clear interrupt flag
+
   m_msgEnabled &= ~(0x1 << n);
+
+  SREG = SaveSREG; // restore interrupt flag
 }
 
 boolean Motorola::messageEnabled(uint8_t n)
@@ -114,6 +161,9 @@ boolean Motorola::messageEnabled(uint8_t n)
 
 void Motorola::setMessageSpeed(uint8_t n, boolean speed)
 {
+  uint8_t SaveSREG = SREG;
+  cli(); // clear interrupt flag
+
   if(speed)
   {
     m_msgSpeed |= (0x1 << n);
@@ -122,10 +172,15 @@ void Motorola::setMessageSpeed(uint8_t n, boolean speed)
   {
     m_msgSpeed &= ~(0x1 << n);
   }
+
+  SREG = SaveSREG; // restore interrupt flag
 }
 
 void Motorola::setMessageOneShot(uint8_t n, boolean oneShot)
 {
+  uint8_t SaveSREG = SREG;
+  cli(); // clear interrupt flag
+
   if(oneShot)
   {
     m_msgOneShot |= (0x1 << n);
@@ -134,6 +189,8 @@ void Motorola::setMessageOneShot(uint8_t n, boolean oneShot)
   {
     m_msgOneShot &= ~(0x1 << n);
   }
+
+  SREG = SaveSREG; // restore interrupt flag
 }
 
 uint8_t cnt = 0;
@@ -143,7 +200,6 @@ void Motorola::onTimerOverflow()
   if(!m_running)
     return;
   
-  //OCR1A = ((m_currentMessage & (0x1 << m_bitCounter))? 182 : 26) * (m_currentSpeed? 1 : 2);
   ICR1 = m_currentSpeed? 208 : 416;
   if(m_bitCounter >= BitCountMsg - 1)
   {

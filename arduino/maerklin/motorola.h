@@ -22,15 +22,14 @@ public:
   static constexpr uint8_t BitCountWait = 22;
 
   static Message oldTrainMessage(uint8_t address, bool function, uint8_t speedLevel);
-//  static Message newTrainMessageDirection(uint8_t address, bool function, int8_t speed);
-//  static Message newTrainMessageFunction(uint8_t address, bool function, int8_t speed, uint8_t nFunction, bool on);
-//  static Message switchMessage(uint8_t address,);
+  static Message switchMessage(uint8_t decoderAddress, uint8_t switchAddress, bool state);
 
   Motorola();
 
   void start();
 
-  Message & message(uint8_t n);
+  void setMessage(uint8_t n, Message message);
+  Message getMessage(uint8_t n);
   void enableMessage(uint8_t n);
   void disableMessage(uint8_t n);
   bool messageEnabled(uint8_t n);
