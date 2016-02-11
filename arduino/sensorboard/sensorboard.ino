@@ -18,6 +18,7 @@ constexpr int MultiplexSelectC = 5; // D5 MSB
 constexpr uint8_t pinRemapping[16] = {0, 1, 2, 3, 4, 5, 6, 7, 11, 10, 9, 8, 15, 14, 13, 12};
 
 uint32_t timestamps[16] = {0};
+uint32_t durations[16] = {0};
 uint16_t inputStates = 0; // bit field: input pin X is high
 uint32_t debounceIn = 10; // time in milliseconds before input edge H/L is detected
 uint32_t debounceOut = 100; // time in milliseconds before an input edge L/H after an edge H/L is detected
@@ -65,7 +66,7 @@ for(inputAddr = 0; inputAddr < 16; inputAddr++)
 
   if(digitalRead(pinToRead) == LOW)
   {
-    if((inputStates & inputAddrMask) == 0 && ((now - timestamps[inputAddr]) > debounceOut))
+    if((inputStates & inputAddrMask) == 0 && ((now - (timestamps[inputAddr] + durations[inputAddr])) > debounceOut))
     {
       Serial.print(pinRemapping[inputAddr]);
       Serial.print(" ");
@@ -81,24 +82,18 @@ for(inputAddr = 0; inputAddr < 16; inputAddr++)
   }
   else
   {
-    if((inputStates & inputAddrMask) > 0)
+    if((inputStates & inputAddrMask) > 0 && ((now - timestamps[inputAddr]) > debounceIn))
     {
-      if((now - timestamps[inputAddr]) > debounceIn)
-      {
-        Serial.print(pinRemapping[inputAddr]);
-        Serial.print(" ");
-        uint32_t duration = now - timestamps[inputAddr];
-        Serial.print(timestamps[inputAddr]);
-        Serial.print(" ");
-        Serial.println(duration);
-        inputStates &= ~inputAddrMask;  
+      Serial.print(pinRemapping[inputAddr]);
+      Serial.print(" ");
+      durations[inputAddr] = now - timestamps[inputAddr];
+      Serial.print(timestamps[inputAddr]);
+      Serial.print(" ");
+      Serial.println(durations[inputAddr]);
+      inputStates &= ~inputAddrMask;  
 
-        // Send message with timestamps[inputAddr] and duration
-	      CAN::send(inputAddr, timestamps[inputAddr], duration);
-
-        // reset timestamp for debounceOut
-        timestamps[inputAddr] = now;
-      }
+      // Send message with timestamp and duration
+      CAN::send(inputAddr, timestamps[inputAddr], durations[inputAddr]);
     }
   }
 
@@ -118,6 +113,8 @@ void msgHandler(CAN::CANAddress address, uint32_t timestamp, uint32_t duration)
 void rtrHandler(CAN::CANAddress address)
 {
   Serial.print("RTR from: "); Serial.println(address, HEX);
+  uint8_t inputAddr = (uint8_t)(address & 0xF);
+  CAN::send(inputAddr, timestamps[inputAddr], durations[inputAddr]);
 }
 
 void errorHandler(byte flags)
