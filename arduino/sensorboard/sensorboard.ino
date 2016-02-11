@@ -24,11 +24,11 @@ uint32_t debounceOut = 100; // time in milliseconds before an input edge L/H aft
 
 void setup()
 {
-  uint16_t address = 0x3E0;
-//  address |= digitalRead(PinAdr0)? 0x10 : 0x00;
-//  address |= digitalRead(PinAdr1)? 0x20 : 0x00;
-//  address |= digitalRead(PinAdr2)? 0x40 : 0x00;
-//  address |= digitalRead(PinAdr3)? 0x80 : 0x00;
+  uint16_t address = 0x300;
+  address |= digitalRead(PinAdr0)? 0x10 : 0x00;
+  address |= digitalRead(PinAdr1)? 0x20 : 0x00;
+  address |= digitalRead(PinAdr2)? 0x40 : 0x00;
+  address |= digitalRead(PinAdr3)? 0x80 : 0x00;
   uint16_t mask = 0x7F0; //take 16 addresses
 
   CAN::start(address, mask);
