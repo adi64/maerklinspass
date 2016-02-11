@@ -72,6 +72,8 @@ for(inputAddr = 0; inputAddr < 16; inputAddr++)
       Serial.print(now);
       Serial.print(" ");
       Serial.println(0);
+
+      CAN::send(inputAddr, timestamps[inputAddr], 0);
       
       timestamps[inputAddr] = now;
       inputStates |= inputAddrMask;
@@ -92,7 +94,7 @@ for(inputAddr = 0; inputAddr < 16; inputAddr++)
         inputStates &= ~inputAddrMask;  
 
         // Send message with timestamps[inputAddr] and duration
-	CAN::inst().send(inputAddr, timestamps[inputAddr], duration);
+	      CAN::send(inputAddr, timestamps[inputAddr], duration);
 
         // reset timestamp for debounceOut
         timestamps[inputAddr] = now;
@@ -100,7 +102,7 @@ for(inputAddr = 0; inputAddr < 16; inputAddr++)
     }
   }
 
-  CAN::inst().processEvents();
+  CAN::processEvents();
 
 }
 
