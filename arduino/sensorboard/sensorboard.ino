@@ -71,7 +71,7 @@ void loop()
       uint32_t timeSinceLastFallingEdge = now - lastFallingEdge;
 
       // handle timer overflow
-      if(now < lastFallingEdge)
+      if((inputStates & inputAddrMask) == 0 && (now < lastFallingEdge))
       {
         timeSinceLastFallingEdge = UINT32_MAX - lastFallingEdge + now;
       }
