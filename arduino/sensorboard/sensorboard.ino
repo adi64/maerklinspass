@@ -67,7 +67,16 @@ void loop()
   
     if(digitalRead(pinToRead) == LOW) // inverting input logic
     {
-      if((inputStates & inputAddrMask) == 0 && ((now - (timestamps[inputAddr] + durations[inputAddr])) > debounceOut))
+      uint32_t lastFallingEdge = timestamps[inputAddr] + durations[inputAddr];
+      uint32_t timeSinceLastFallingEdge = now - lastFallingEdge;
+
+      // handle timer overflow
+      if(now < lastFallingEdge)
+      {
+        timeSinceLastFallingEdge = UINT32_MAX - lastFallingEdge + now;
+      }
+            
+      if((inputStates & inputAddrMask) == 0 && (timeSinceLastFallingEdge > debounceOut))
       {
         Serial.print(pinRemapping[inputAddr]);
         Serial.print(" ");
@@ -83,11 +92,20 @@ void loop()
     }
     else
     {
-      if((inputStates & inputAddrMask) > 0 && ((now - timestamps[inputAddr]) > debounceIn))
+      uint32_t timeSinceLastRisingEdge = now - timestamps[inputAddr];
+
+      // handle timer overflow
+      if(now < timestamps[inputAddr])
       {
+        timeSinceLastRisingEdge = UINT32_MAX - timestamps[inputAddr] + now;
+      }
+      
+      if((inputStates & inputAddrMask) > 0 && (timeSinceLastRisingEdge > debounceIn))
+      {
+        durations[inputAddr] = timeSinceLastRisingEdge;
+        
         Serial.print(pinRemapping[inputAddr]);
         Serial.print(" ");
-        durations[inputAddr] = now - timestamps[inputAddr];
         Serial.print(timestamps[inputAddr]);
         Serial.print(" ");
         Serial.println(durations[inputAddr]);
