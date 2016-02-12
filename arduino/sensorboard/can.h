@@ -21,8 +21,6 @@ public:
   static constexpr int PinMOSI = 11;
   static constexpr int PinSCK = 13;
 
-//  static CAN inst();
-
   static void start(CANAddress address, CANAddress mask);
   static void setMsgHandler(CANMsgHandler * handler);
   static void setRTRHandler(CANRTRHandler * handler);
