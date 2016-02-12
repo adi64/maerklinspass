@@ -3,10 +3,15 @@
 
 Motorola motorola;
 
-const uint8_t address[] = {1, 3, 65};
+const uint8_t address[] = {Motorola::IdleAddress, 1, 3, 65};
 const uint8_t addressCount = 3;
 
 constexpr uint8_t SwitchMsgSlot = 7;
+
+constexpr uint8_t switchArrayAddress[] = {1, 3};
+constexpr uint8_t switchArrayState[] = {15, 12, 3};
+
+constexpr uint8_t sectionOccupants[4] = {0, 1, 2, 3};
 
 ISR(TIMER1_OVF_vect)
 {
@@ -31,6 +36,11 @@ void setSwitchArray(uint8_t decoderAddress, uint8_t states) //first 4 bits: 0 = 
   }
 }
 
+
+int incomingSerialByte;
+int serialBytes[3];
+int parsedSerialBytes[3];
+
 void setup() {
   motorola.start(); 
 
@@ -47,20 +57,13 @@ void setup() {
   CAN::start(CANaddress, CANmask);
   CAN::setMsgHandler(&msgHandler);
   CAN::setErrorHandler(&errorHandler);
-  
 
   Serial.begin(9600);
   Serial.setTimeout(60000);
 }
 
-int incomingSerialByte;
-int serialBytes[3];
-int parsedSerialBytes[3];
-
-void loop() {
-
-  CAN::processEvents();
-
+void parseSerialInput()
+{
   incomingSerialByte = Serial.read();
   if(incomingSerialByte == -1)
     return;
@@ -102,9 +105,17 @@ void loop() {
     
     if(0 <= state && state < 3)
     {
-      setSwitchArray(swaAddr, (state == 0)? 15 : ((state == 1)? 12 : 3));
+      setSwitchArray(switchArrayAddress[swaAddr], switchArrayState[state]);
     }    
   }
+}
+
+
+void loop() {
+
+  CAN::processEvents();
+  parseSerialInput();
+  
 }
 
 void msgHandler(CAN::CANAddress CANaddress, uint32_t timestamp, uint32_t duration)
@@ -112,9 +123,36 @@ void msgHandler(CAN::CANAddress CANaddress, uint32_t timestamp, uint32_t duratio
   motorola.setMessage(0, Motorola::oldTrainMessage(address[0], true, 0));
   motorola.setMessage(1, Motorola::oldTrainMessage(address[1], true, 0));
   motorola.setMessage(2, Motorola::oldTrainMessage(address[2], true, 0));
-  
+
   Serial.print("Msg from "); Serial.print(CANaddress, HEX);
   Serial.print(": "); Serial.print(timestamp); Serial.print(" - "); Serial.println(duration);
+
+  if(CANaddress & 0x1 != 0)
+    return;
+
+  if(duration != 0)
+    return;
+
+  switch(CANaddress & 0xE)
+  {
+    case 0x0: // SA0, outer entering
+      break;
+    case 0x2: // SA0, inner entering
+      break;
+    case 0x4: // SA0, inner leaving
+      break;
+    case 0x6: // SA0, outer leaving
+      break;
+    case 0x8: // SA1, outer entering
+      break;
+    case 0xA: // SA1, inner entering
+      break;
+    case 0xC: // SA1, inner leaving
+      break;
+    case 0xE: // SA1, outer leaving
+      break;
+  }
+  
 }
 
 void errorHandler(byte flags)
