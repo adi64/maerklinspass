@@ -32,12 +32,6 @@ void setSwitchArray(uint8_t decoderAddress, uint8_t states) //first 4 bits: 0 = 
 }
 
 void setup() {
-  uint16_t CANaddress = 0x300;
-  uint16_t CANmask = 0x700;
-  CAN::start(CANaddress, CANmask);
-  CAN::setMsgHandler(&msgHandler);
-  CAN::setErrorHandler(&errorHandler);
-  
   motorola.start(); 
 
   for(uint8_t i = 0; i < addressCount; ++i)
@@ -47,6 +41,13 @@ void setup() {
     motorola.setMessageOneShot(i, false);
     motorola.enableMessage(i);
   }
+  
+  uint16_t CANaddress = 0x300;
+  uint16_t CANmask = 0x700;
+  CAN::start(CANaddress, CANmask);
+  CAN::setMsgHandler(&msgHandler);
+  CAN::setErrorHandler(&errorHandler);
+  
 
   Serial.begin(9600);
   Serial.setTimeout(60000);
