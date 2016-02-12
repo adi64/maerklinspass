@@ -1,3 +1,4 @@
+#include "can.h"
 #include "motorola.h"
 
 Motorola motorola;
@@ -31,6 +32,12 @@ void setSwitchArray(uint8_t decoderAddress, uint8_t states) //first 4 bits: 0 = 
 }
 
 void setup() {
+  uint16_t CANaddress = 0x300;
+  uint16_t CANmask = 0x700;
+  CAN::start(CANaddress, CANmask);
+  CAN::setMsgHandler(&msgHandler);
+  CAN::setErrorHandler(&errorHandler);
+  
   motorola.start(); 
 
   for(uint8_t i = 0; i < addressCount; ++i)
@@ -45,12 +52,39 @@ void setup() {
   Serial.setTimeout(60000);
 }
 
+int incomingSerialByte;
+int serialBytes[3];
+int parsedSerialBytes[3];
+
 void loop() {
-  String cmd = Serial.readStringUntil(' ');
-  if(cmd.indexOf('L') >= 0)
+
+  CAN::processEvents();
+
+  incomingSerialByte = Serial.read();
+  if(incomingSerialByte == -1)
+    return;
+
+  serialBytes[0] = serialBytes[1];
+  serialBytes[1] = serialBytes[2];
+  serialBytes[2] = incomingSerialByte;
+
+  for(int i=1; i<3; i++)
   {
-    long trainNo = Serial.parseInt();
-    long speed = Serial.parseInt();
+    if(serialBytes[i] >= '0' && serialBytes[i] <= '9')
+      parsedSerialBytes[i] = serialBytes[i] - '0';
+    else if(serialBytes[i] >= 'A' && serialBytes[i] <= 'F')
+      parsedSerialBytes[i] = serialBytes[i] - 'A' + 10;
+    else
+      parsedSerialBytes[i] = -1;
+  }
+
+  if(parsedSerialBytes[1] == -1 || parsedSerialBytes[2] == -1)
+    return;
+
+  if(serialBytes[0] == 'L')
+  {
+    long trainNo = parsedSerialBytes[1];
+    long speed = parsedSerialBytes[2];
     Serial.print("Zug "); Serial.print(trainNo); Serial.print(": "); Serial.println(speed);
     
     if(0 <= trainNo && trainNo < addressCount &&
@@ -59,15 +93,31 @@ void loop() {
       motorola.setMessage(trainNo, Motorola::oldTrainMessage(address[(uint8_t)trainNo], true, (uint8_t)speed));
     }
   }
-  else if(cmd.indexOf('W') >= 0)
+  else if(serialBytes[0] == 'W')
   {
-    long swaAddr = Serial.parseInt();
-    long state = Serial.parseInt();
+    long swaAddr = parsedSerialBytes[1];
+    long state = parsedSerialBytes[2];
     Serial.print("Weiche "); Serial.print(swaAddr); Serial.print(": "); Serial.println(state);
     
     if(0 <= state && state < 3)
     {
       setSwitchArray(swaAddr, (state == 0)? 15 : ((state == 1)? 12 : 3));
-    }
+    }    
   }
 }
+
+void msgHandler(CAN::CANAddress CANaddress, uint32_t timestamp, uint32_t duration)
+{
+  motorola.setMessage(0, Motorola::oldTrainMessage(address[0], true, 0));
+  motorola.setMessage(1, Motorola::oldTrainMessage(address[1], true, 0));
+  motorola.setMessage(2, Motorola::oldTrainMessage(address[2], true, 0));
+  
+  Serial.print("Msg from "); Serial.print(CANaddress, HEX);
+  Serial.print(": "); Serial.print(timestamp); Serial.print(" - "); Serial.println(duration);
+}
+
+void errorHandler(byte flags)
+{
+  Serial.print("ERROR: "); Serial.println(flags, HEX);
+}
+
