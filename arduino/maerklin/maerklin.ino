@@ -4,7 +4,7 @@
 Motorola motorola;
 
 const uint8_t address[] = {Motorola::IdleAddress, 1, 3, 65};
-const uint8_t addressCount = 3;
+const uint8_t addressCount = 4;
 
 constexpr uint8_t SwitchMsgSlot = 7;
 
@@ -111,11 +111,9 @@ void parseSerialInput()
 }
 
 
-void loop() {
-
-  CAN::processEvents();
+void loop()
+{
   parseSerialInput();
-  
 }
 
 void msgHandler(CAN::CANAddress CANaddress, uint32_t timestamp, uint32_t duration)
