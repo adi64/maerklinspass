@@ -10,6 +10,7 @@ public:
   using MessageBufferMask = uint8_t;
   static constexpr uint8_t MessageBufferSize = 8;
 
+  static constexpr uint8_t IdleAddress = 81;
   static constexpr Message IdleMessage = 0x00055;
   static constexpr Message IdleSpeed = false;
 
