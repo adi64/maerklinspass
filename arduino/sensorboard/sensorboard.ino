@@ -61,13 +61,14 @@ void loop()
     // the Arduino is slow enough that we don't have to delay reading the data
   
     int pinToRead = inputAddr < 8 ? MultiplexInputA : MultiplexInputB;
-    uint16_t inputAddrMask = 1 << inputAddr;
-  
+    int remappedInputAddr = pinRemapping[inputAddr];
+    uint16_t inputAddrMask = 1 << remappedInputAddr;
+
     uint32_t now = millis();
   
     if(digitalRead(pinToRead) == LOW) // inverting input logic
     {
-      uint32_t lastFallingEdge = timestamps[inputAddr] + durations[inputAddr];
+      uint32_t lastFallingEdge = timestamps[remappedInputAddr] + durations[remappedInputAddr];
       uint32_t timeSinceLastFallingEdge = now - lastFallingEdge;
 
       // handle timer overflow
@@ -78,42 +79,42 @@ void loop()
             
       if((inputStates & inputAddrMask) == 0 && (timeSinceLastFallingEdge > debounceOut))
       {
-        Serial.print(pinRemapping[inputAddr]);
+        Serial.print(remappedInputAddr);
         Serial.print(" ");
         Serial.print(now);
         Serial.print(" ");
         Serial.println(0);
               
-        timestamps[inputAddr] = now;
+        timestamps[remappedInputAddr] = now;
         inputStates |= inputAddrMask;
   
-        CAN::send(inputAddr, timestamps[inputAddr], 0);
+        CAN::send(remappedInputAddr, timestamps[remappedInputAddr], 0);
       }
     }
     else
     {
-      uint32_t timeSinceLastRisingEdge = now - timestamps[inputAddr];
+      uint32_t timeSinceLastRisingEdge = now - timestamps[remappedInputAddr];
 
       // handle timer overflow
-      if(now < timestamps[inputAddr])
+      if(now < timestamps[remappedInputAddr])
       {
-        timeSinceLastRisingEdge = UINT32_MAX - timestamps[inputAddr] + now;
+        timeSinceLastRisingEdge = UINT32_MAX - timestamps[remappedInputAddr] + now;
       }
       
       if((inputStates & inputAddrMask) > 0 && (timeSinceLastRisingEdge > debounceIn))
       {
-        durations[inputAddr] = timeSinceLastRisingEdge;
+        durations[remappedInputAddr] = timeSinceLastRisingEdge;
         
-        Serial.print(pinRemapping[inputAddr]);
+        Serial.print(remappedInputAddr);
         Serial.print(" ");
-        Serial.print(timestamps[inputAddr]);
+        Serial.print(timestamps[remappedInputAddr]);
         Serial.print(" ");
-        Serial.println(durations[inputAddr]);
+        Serial.println(durations[remappedInputAddr]);
         
         inputStates &= ~inputAddrMask;  
   
         // Send message with timestamp and duration
-        CAN::send(inputAddr, timestamps[inputAddr], durations[inputAddr]);
+        CAN::send(remappedInputAddr, timestamps[remappedInputAddr], durations[remappedInputAddr]);
       }
     }
   
