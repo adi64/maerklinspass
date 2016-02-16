@@ -372,6 +372,12 @@ void setup() {
     Motorola::enableMessage(i);
   }
 
+  // reset switch arrays
+  for(uint8_t switchArrayNo = 0; switchArrayNo < 2; switchArrayNo++)
+  {
+    setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[0]);
+  }
+
   CAN::StdIdentifier address = 0x300;
   CAN::StdIdentifier mask = 0x700;
   CAN::start(&msgHandler, &errorHandler);
