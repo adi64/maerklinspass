@@ -41,7 +41,7 @@ void setSwitchArray(uint8_t decoderAddress, uint8_t states) //first 4 bits: 0 = 
   }
 }
 
-void msgHandler(CAN::MessageEvent * message)
+void msgHandler(const CAN::MessageEvent * message)
 {
   motorola.setMessage(0, Motorola::oldTrainMessage(trainAddress[0], true, 0));
   motorola.setMessage(1, Motorola::oldTrainMessage(trainAddress[1], true, 0));
@@ -82,7 +82,7 @@ void msgHandler(CAN::MessageEvent * message)
 
 }
 
-void errorHandler(CAN::ErrorEvent * error)
+void errorHandler(const CAN::ErrorEvent * error)
 {
   Serial.print("ERROR: 0x"); Serial.println(error->flags, HEX);
 }
