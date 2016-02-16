@@ -383,4 +383,5 @@ void setup() {
 
 void loop() {
   parseSerialInput();
+  operateSwitchArrays();
 }
