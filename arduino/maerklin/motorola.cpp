@@ -90,7 +90,7 @@ void Motorola::start()
 {
   cli();
 
-  digitalWrite(PinGo, HIGH);
+  digitalWrite(PinGo, LOW);
   pinMode(PinGo, OUTPUT);
 
   digitalWrite(PinData, HIGH);
