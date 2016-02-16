@@ -36,13 +36,54 @@ void setSwitchArray(uint8_t decoderAddress, uint8_t states) //first 4 bits: 0 = 
   }
 }
 
+void msgHandler(CAN::MessageEvent * message)
+{
+  motorola.setMessage(0, Motorola::oldTrainMessage(address[0], true, 0));
+  motorola.setMessage(1, Motorola::oldTrainMessage(address[1], true, 0));
+  motorola.setMessage(2, Motorola::oldTrainMessage(address[2], true, 0));
+  motorola.setMessage(3, Motorola::oldTrainMessage(address[3], true, 0));
 
-int incomingSerialByte;
-int serialBytes[3];
-int parsedSerialBytes[3];
+  CAN::StdIdentifier contactAddr = message->stdIdentifier;
+  // uint32_t timestamp =
+  // uint32_t duration =
+  Serial.print("Msg from 0x");Serial.println(contactAddr, HEX);
+  // Serial.print(": "); Serial.print(timestamp); Serial.print(" - "); Serial.println(duration);
+
+  if((contactAddr & 0x1) != 0)
+    return;
+
+  // if(duration != 0)
+  //   return;
+
+  switch(contactAddr & 0xE)
+  {
+    case 0x0: // SA0, outer entering
+      break;
+    case 0x2: // SA0, inner entering
+      break;
+    case 0x4: // SA0, inner leaving
+      break;
+    case 0x6: // SA0, outer leaving
+      break;
+    case 0x8: // SA1, outer entering
+      break;
+    case 0xA: // SA1, inner entering
+      break;
+    case 0xC: // SA1, inner leaving
+      break;
+    case 0xE: // SA1, outer leaving
+      break;
+  }
+
+}
+
+void errorHandler(CAN::ErrorEvent * error)
+{
+  Serial.print("ERROR: 0x"); Serial.println(error->flags, HEX);
+}
 
 void setup() {
-  motorola.start(); 
+  motorola.start();
 
   for(uint8_t i = 0; i < addressCount; ++i)
   {
@@ -51,17 +92,19 @@ void setup() {
     motorola.setMessageOneShot(i, false);
     motorola.enableMessage(i);
   }
-  
-  uint16_t CANaddress = 0x300;
-  uint16_t CANmask = 0x700;
-  CAN::start(CANaddress, CANmask);
-  CAN::setMsgHandler(&msgHandler);
-  CAN::setErrorHandler(&errorHandler);
+
+  CAN::StdIdentifier address = 0x300;
+  CAN::StdIdentifier mask = 0x700;
+  CAN::start(&msgHandler, &errorHandler);
+  CAN::setReceiveFilter(address, mask);
 
   Serial.begin(9600);
   Serial.setTimeout(60000);
 }
 
+int incomingSerialByte;
+int serialBytes[3];
+int parsedSerialBytes[3];
 void parseSerialInput()
 {
   incomingSerialByte = Serial.read();
@@ -90,7 +133,7 @@ void parseSerialInput()
     long trainNo = parsedSerialBytes[1];
     long speed = parsedSerialBytes[2];
     Serial.print("Zug "); Serial.print(trainNo); Serial.print(": "); Serial.println(speed);
-    
+
     if(0 <= trainNo && trainNo < addressCount &&
        0 <= speed && speed < 16)
     {
@@ -102,59 +145,15 @@ void parseSerialInput()
     long swaAddr = parsedSerialBytes[1];
     long state = parsedSerialBytes[2];
     Serial.print("Weiche "); Serial.print(swaAddr); Serial.print(": "); Serial.println(state);
-    
+
     if(0 <= state && state < 3)
     {
       setSwitchArray(switchArrayAddress[swaAddr], switchArrayState[state]);
-    }    
+    }
   }
 }
 
-
-void loop()
-{
+void loop() {
   parseSerialInput();
-}
-
-void msgHandler(CAN::CANAddress CANaddress, uint32_t timestamp, uint32_t duration)
-{
-  motorola.setMessage(0, Motorola::oldTrainMessage(address[0], true, 0));
-  motorola.setMessage(1, Motorola::oldTrainMessage(address[1], true, 0));
-  motorola.setMessage(2, Motorola::oldTrainMessage(address[2], true, 0));
-
-  Serial.print("Msg from "); Serial.print(CANaddress, HEX);
-  Serial.print(": "); Serial.print(timestamp); Serial.print(" - "); Serial.println(duration);
-
-  if(CANaddress & 0x1 != 0)
-    return;
-
-  if(duration != 0)
-    return;
-
-  switch(CANaddress & 0xE)
-  {
-    case 0x0: // SA0, outer entering
-      break;
-    case 0x2: // SA0, inner entering
-      break;
-    case 0x4: // SA0, inner leaving
-      break;
-    case 0x6: // SA0, outer leaving
-      break;
-    case 0x8: // SA1, outer entering
-      break;
-    case 0xA: // SA1, inner entering
-      break;
-    case 0xC: // SA1, inner leaving
-      break;
-    case 0xE: // SA1, outer leaving
-      break;
-  }
-  
-}
-
-void errorHandler(byte flags)
-{
-  Serial.print("ERROR: "); Serial.println(flags, HEX);
 }
 
