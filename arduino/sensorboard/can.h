@@ -9,44 +9,90 @@ class CAN
 {
   static const SPISettings SPIConfig;
 
-public:
-  using CANAddress = uint16_t;
-  using CANMsgHandler = void(CANAddress, uint32_t, uint32_t);
-  using CANRTRHandler = void(CANAddress);
-  using CANErrorHandler = void(byte);
-
   static constexpr int PinNCS = 10;
   static constexpr int PinNInt = 2;
   static constexpr int PinMISO = 12;
   static constexpr int PinMOSI = 11;
   static constexpr int PinSCK = 13;
 
-  static void start(CANAddress address, CANAddress mask);
-  static void setMsgHandler(CANMsgHandler * handler);
-  static void setRTRHandler(CANRTRHandler * handler);
-  static void setErrorHandler(CANErrorHandler * handler);
-  static void send(CANAddress address, uint32_t timestamp, uint32_t duration);
-  static void sendRTR(CANAddress address);
-  static bool pendingTransmission();
+  static constexpr uint8_t ModeNormal = 0;
+  static constexpr uint8_t ModeSleep = 1;
+  static constexpr uint8_t ModeLoopback = 2;
+  static constexpr uint8_t ModeListen = 3;
+  static constexpr uint8_t ModeConfig = 4;
 
-  static void processEvents(byte eventMask = 0xFF);
+public:
+  using StdIdentifier = uint16_t;
+  using ExtIdentifier = uint32_t;
 
-  static void onCANEvent();
+  using ErrorEvent = struct
+  {
+    uint32_t timestamp;
+
+    uint8_t flags;
+  };
+  using ErrorHandler = void(const ErrorEvent *);
+
+  using MessageEvent = struct
+  {
+    uint32_t timestamp;
+
+    bool hasExtIdentifier;
+    union
+    {
+      StdIdentifier stdIdentifier;
+      ExtIdentifier extIdentifier;
+    };
+    bool isRTR;
+
+    uint8_t length;
+    uint8_t content[8];
+  };
+  using MessageHandler = void(const MessageEvent *);
+
+  static constexpr int MessageQueueSize = 16;
+  static constexpr int ErrorQueueSize = 4;
+
+public:
+  static void start(MessageHandler * msgHandler = nullptr, ErrorHandler * errorHandler = nullptr);
+
+  static void setReceiveFilter(StdIdentifier identifier, StdIdentifier mask);
+  static void setReceiveFilter(ExtIdentifier identifier, ExtIdentifier mask);
+  static void clearReceiveFilter(); // stop message reception entirely
+
+  static MessageEvent * prepareMessage(); //disables interrupts until sendMessage() is called
+  static bool commitMessage(MessageEvent * message); // message must be a pointer obtained through prepareMessage()
 
 private:
   CAN() = default;
-  static void canCommand(byte * command, int length);
+
+  static void onInterrupt();
+
+  static void sendMessage(const MessageEvent * message);
+  static void receiveMessage(MessageEvent * message);
+
+  static void setMode(uint8_t mode);
+  static void canCommand(uint8_t * command, uint8_t length);
 
 private:
-  static CAN::CANAddress m_address;
-  static CAN::CANAddress m_mask;
+  static MessageEvent s_sendQueue[MessageQueueSize];
+  static volatile uint8_t s_sendQueueFree;
+  static volatile uint8_t s_sendQueueNext;
+  static volatile bool s_sendPending;
 
-  static volatile bool m_transmitPending;
-  static volatile byte m_eventsPending;
-  static volatile byte m_errorsPending;
+  static MessageEvent s_receiveQueue[MessageQueueSize];
+  static volatile uint8_t s_receiveQueueFree;
+  static volatile uint8_t s_receiveQueueNext;
+  static volatile bool s_handlingMessages;
 
-  static CANMsgHandler * m_msgHandler;
-  static CANRTRHandler * m_rtrHandler;
-  static CANErrorHandler * m_errorHandler;
+  static ErrorEvent s_errorQueue[ErrorQueueSize];
+  static volatile uint8_t s_errorQueueFree;
+  static volatile uint8_t s_errorQueueNext;
+  static volatile bool s_handlingErrors;
+
+  static MessageHandler * s_messageHandler;
+  static ErrorHandler * s_errorHandler;
+
+  static uint8_t s_prepareMessageSREG;
 };
 

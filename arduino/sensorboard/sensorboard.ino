@@ -13,7 +13,7 @@ constexpr int MultiplexSelectB = 6; // D6
 constexpr int MultiplexSelectC = 5; // D5 MSB
 
 // remapping to get consistent input pin numbering
-constexpr uint8_t pinRemapping[16] = {0, 1, 2, 3, 4, 5, 6, 7, 11, 10, 9, 8, 15, 14, 13, 12};
+constexpr uint8_t pinToContactMap[16] = {0, 1, 2, 3, 4, 5, 6, 7, 11, 10, 9, 8, 15, 14, 13, 12};
 
 uint32_t timestamps[16] = {0}; // last start of track signal
 uint32_t durations[16] = {0}; // last duration of track signal
@@ -21,123 +21,137 @@ uint16_t inputStates = 0; // bit field: input pin X is currently high
 uint32_t debounceIn = 10; // time in milliseconds before input edge H/L is detected
 uint32_t debounceOut = 100; // time in milliseconds before an input edge L/H after an edge H/L is detected
 
+CAN::StdIdentifier canAddress = 0x300;
+CAN::StdIdentifier canAddressMask = 0x7F0; //take 16 addresses
+
+void encodeLong(const uint32_t & value, uint8_t * buffer)
+{
+  buffer[0] = (uint8_t) (value & 0x000000FF);
+  buffer[1] = (uint8_t)((value & 0x0000FF00) >>  8);
+  buffer[2] = (uint8_t)((value & 0x0000FF00) >> 16);
+  buffer[3] = (uint8_t)((value & 0x0000FF00) >> 24);
+}
+
+void send(uint8_t pin, uint32_t timestamp, uint32_t duration)
+{
+  CAN::MessageEvent * msg = CAN::prepareMessage();
+  if(!msg)
+    return;
+  msg->hasExtIdentifier = false;
+  msg->stdIdentifier = (canAddress & canAddressMask) |
+                       (pin & ~canAddressMask);
+  msg->isRTR = false;
+  msg->length = 8;
+  encodeLong(timestamp, msg->content);
+  encodeLong(duration, msg->content + 4);
+  CAN::commitMessage(msg);
+}
+
+void msgHandler(const CAN::MessageEvent * msg)
+{
+  if(msg->isRTR)
+  {
+    Serial.print("Request for 0x"); Serial.print(msg->stdIdentifier, HEX);
+  }
+  uint8_t contactNumber = msg->stdIdentifier & 0x00F;
+  send(contactNumber, timestamps[contactNumber], durations[contactNumber]);
+}
+
+void errorHandler(const CAN::ErrorEvent * error)
+{
+  Serial.print("Error 0x"); Serial.println(error->flags, HEX);
+}
+
 void setup()
 {
-  uint16_t address = 0x300;
-  address |= digitalRead(PinAdr0)? 0x10 : 0x00;
-  address |= digitalRead(PinAdr1)? 0x20 : 0x00;
-  address |= digitalRead(PinAdr2)? 0x40 : 0x00;
-  address |= digitalRead(PinAdr3)? 0x80 : 0x00;
-  uint16_t mask = 0x7F0; //take 16 addresses
+  canAddress |= digitalRead(PinAdr0)? 0x10 : 0x00;
+  canAddress |= digitalRead(PinAdr1)? 0x20 : 0x00;
+  canAddress |= digitalRead(PinAdr2)? 0x40 : 0x00;
+  canAddress |= digitalRead(PinAdr3)? 0x80 : 0x00;
 
-  CAN::start(address, mask);
-  CAN::setMsgHandler(&msgHandler);
-  CAN::setRTRHandler(&rtrHandler);
-  CAN::setErrorHandler(&errorHandler);
+  CAN::start(&msgHandler, &errorHandler);
+  CAN::setReceiveFilter(canAddress, canAddressMask);
 
   pinMode(MultiplexInputA, INPUT);
   pinMode(MultiplexInputB, INPUT);
   pinMode(MultiplexSelectA, OUTPUT);
   pinMode(MultiplexSelectB, OUTPUT);
   pinMode(MultiplexSelectC, OUTPUT);
-  
+
   Serial.begin(9600);
 }
 
-uint8_t addr = 0;
-
-uint8_t inputAddr = 0;
-
 void loop()
 {
-
-  for(inputAddr = 0; inputAddr < 16; inputAddr++)
+  for(uint8_t pinNumber = 0; pinNumber < 16; ++pinNumber)
   {
-    digitalWrite(MultiplexSelectA, inputAddr & 0b001 ? HIGH : LOW);
-    digitalWrite(MultiplexSelectB, inputAddr & 0b010 ? HIGH : LOW);
-    digitalWrite(MultiplexSelectC, inputAddr & 0b100 ? HIGH : LOW);
+    digitalWrite(MultiplexSelectA, (pinNumber & 0b0001)? HIGH : LOW);
+    digitalWrite(MultiplexSelectB, (pinNumber & 0b0010)? HIGH : LOW);
+    digitalWrite(MultiplexSelectC, (pinNumber & 0b0100)? HIGH : LOW);
+    int inputPin = (pinNumber & 0b1000)? MultiplexInputB : MultiplexInputA;
+    uint8_t contactNumber = pinToContactMap[pinNumber];
+    uint16_t contactMask = 1 << contactNumber;
 
     // the multiplexers are really quick -
     // the Arduino is slow enough that we don't have to delay reading the data
-  
-    int pinToRead = inputAddr < 8 ? MultiplexInputA : MultiplexInputB;
-    int remappedInputAddr = pinRemapping[inputAddr];
-    uint16_t inputAddrMask = 1 << remappedInputAddr;
 
     uint32_t now = millis();
-  
-    if(digitalRead(pinToRead) == LOW) // inverting input logic
+    if(digitalRead(inputPin) == LOW) // inverting input logic
     {
-      uint32_t lastFallingEdge = timestamps[remappedInputAddr] + durations[remappedInputAddr];
+      uint32_t lastFallingEdge = timestamps[contactNumber] + durations[contactNumber];
       uint32_t timeSinceLastFallingEdge = now - lastFallingEdge;
 
       // handle timer overflow
-      if((inputStates & inputAddrMask) == 0 && (now < lastFallingEdge))
+      if((inputStates & contactMask) == 0 && (now < lastFallingEdge))
       {
         timeSinceLastFallingEdge = UINT32_MAX - lastFallingEdge + now;
       }
-            
-      if((inputStates & inputAddrMask) == 0 && (timeSinceLastFallingEdge > debounceOut))
+
+      if((inputStates & contactMask) == 0 && (timeSinceLastFallingEdge > debounceOut))
       {
-        Serial.print(remappedInputAddr);
+        Serial.print(pinNumber);
+        Serial.print(">");
+        Serial.print(contactNumber);
         Serial.print(" ");
         Serial.print(now);
         Serial.print(" ");
         Serial.println(0);
-              
-        timestamps[remappedInputAddr] = now;
-        inputStates |= inputAddrMask;
-  
-        CAN::send(remappedInputAddr, timestamps[remappedInputAddr], 0);
+
+        timestamps[contactNumber] = now;
+        inputStates |= contactMask;
+
+        send(contactNumber, timestamps[contactNumber], 0);
       }
     }
     else
     {
-      uint32_t timeSinceLastRisingEdge = now - timestamps[remappedInputAddr];
+      uint32_t timeSinceLastRisingEdge = now - timestamps[contactNumber];
 
       // handle timer overflow
-      if(now < timestamps[remappedInputAddr])
+      if(now < timestamps[contactNumber])
       {
-        timeSinceLastRisingEdge = UINT32_MAX - timestamps[remappedInputAddr] + now;
+        timeSinceLastRisingEdge = UINT32_MAX - timestamps[contactNumber] + now;
       }
-      
-      if((inputStates & inputAddrMask) > 0 && (timeSinceLastRisingEdge > debounceIn))
+
+      if((inputStates & contactMask) > 0 && (timeSinceLastRisingEdge > debounceIn))
       {
-        durations[remappedInputAddr] = timeSinceLastRisingEdge;
-        
-        Serial.print(remappedInputAddr);
+        durations[contactNumber] = timeSinceLastRisingEdge;
+
+        Serial.print(pinNumber);
+        Serial.print(">");
+        Serial.print(contactNumber);
         Serial.print(" ");
-        Serial.print(timestamps[remappedInputAddr]);
+        Serial.print(timestamps[contactNumber]);
         Serial.print(" ");
-        Serial.println(durations[remappedInputAddr]);
-        
-        inputStates &= ~inputAddrMask;  
-  
+        Serial.println(durations[contactNumber]);
+
+        inputStates &= ~contactMask;
+
         // Send message with timestamp and duration
-        CAN::send(remappedInputAddr, timestamps[remappedInputAddr], durations[remappedInputAddr]);
+        send(contactNumber, timestamps[contactNumber], durations[contactNumber]);
       }
     }
-  
-    CAN::processEvents();
   }
-}
-
-void msgHandler(CAN::CANAddress address, uint32_t timestamp, uint32_t duration)
-{
-  Serial.print("Msg from "); Serial.print(address, HEX);
-  Serial.print(": "); Serial.print(timestamp); Serial.print(" - "); Serial.println(duration);
-}
-
-void rtrHandler(CAN::CANAddress address)
-{
-  Serial.print("RTR from: "); Serial.println(address, HEX);
-  uint8_t inputAddr = (uint8_t)(address & 0xF);
-  CAN::send(inputAddr, timestamps[inputAddr], durations[inputAddr]);
-}
-
-void errorHandler(byte flags)
-{
-  Serial.print("ERROR: "); Serial.println(flags, HEX);
 }
 
 
