@@ -8,6 +8,7 @@ public:
   using Message = uint32_t;
   using MessageSpeed = bool; // bit time is (speed)? 104 : 208 us
   using MessageBufferMask = uint8_t;
+
   static constexpr uint8_t MessageBufferSize = 8;
 
   static constexpr uint8_t IdleAddress = 81;
@@ -25,37 +26,36 @@ public:
   static Message oldTrainMessage(uint8_t address, bool function, uint8_t speedLevel);
   static Message switchMessage(uint8_t decoderAddress, uint8_t switchAddress, bool state);
 
-  Motorola();
+  static void start();
 
-  void start();
+  static void setMessage(uint8_t n, Message message);
+  static Message getMessage(uint8_t n);
+  static void enableMessage(uint8_t n);
+  static void disableMessage(uint8_t n);
+  static bool messageEnabled(uint8_t n);
+  static void setMessageSpeed(uint8_t n, MessageSpeed speed);
+  static void setMessageOneShot(uint8_t n, bool oneShot);
 
-  void setMessage(uint8_t n, Message message);
-  Message getMessage(uint8_t n);
-  void enableMessage(uint8_t n);
-  void disableMessage(uint8_t n);
-  bool messageEnabled(uint8_t n);
-  void setMessageSpeed(uint8_t n, MessageSpeed speed);
-  void setMessageOneShot(uint8_t n, bool oneShot);
-
-  void onTimerOverflow();
-  void onErrorPin();
+  static void onTimerOverflow();
+  static void onErrorPin();
 
 private:
-  void loadNextMessage();
-  
+  Motorola() = default;
+
+  static void loadNextMessage();
+
 private:
-  Message m_dummyMsg;
-  Message m_msgBuffer[MessageBufferSize];
+  static Message s_msgBuffer[MessageBufferSize];
 
-  MessageBufferMask m_msgEnabled;
-  MessageBufferMask m_msgSpeed;
-  MessageBufferMask m_msgOneShot;
+  static MessageBufferMask s_msgEnabled;
+  static MessageBufferMask s_msgSpeed;
+  static MessageBufferMask s_msgOneShot;
 
-  bool m_running;
+  static bool s_running;
 
-  uint8_t m_currentMsgNumber;
-  bool m_state;
-  uint8_t m_bitCounter;
-  MessageSpeed m_currentSpeed;
-  Message m_currentMessage;
+  static uint8_t s_currentMsgNumber;
+  static bool s_state;
+  static uint8_t s_bitCounter;
+  static MessageSpeed s_currentSpeed;
+  static Message s_currentMessage;
 };

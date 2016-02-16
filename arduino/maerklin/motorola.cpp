@@ -1,5 +1,10 @@
 #include "motorola.h"
 
+ISR(TIMER1_OVF_vect)
+{
+  Motorola::onTimerOverflow();
+}
+
 uint8_t addressToLineBits(int8_t address)
 {
     // fixes for weird encoding
@@ -50,7 +55,7 @@ uint8_t speedToLineBits(uint8_t speed)
 uint8_t switchStateToLineBits(uint8_t switchAddress, bool state)
 {
   uint8_t encodedState = 0;
-  
+
   for(int i = 0; i < 3; ++i)
   {
     encodedState |= ((switchAddress & (0x1 << i))? 0b11 : 0b00) << (2*i);
@@ -67,7 +72,7 @@ Motorola::Message Motorola::oldTrainMessage(uint8_t address, bool function, uint
   message |= ((uint32_t) speedToLineBits(speedLevel)) << 10;
   message |= (function? 0b11 : 0b00) << 8;
   message |= ((uint32_t) addressToLineBits(address)) << 0;
-  
+
   return message;
 }
 
@@ -81,27 +86,27 @@ Motorola::Message Motorola::switchMessage(uint8_t decoderAddress, uint8_t switch
   return message;
 }
 
-Motorola::Motorola()
-: m_msgEnabled(0x00)
-, m_msgSpeed(0x00)
-, m_running(false)
-{
-  pinMode(PinData, OUTPUT);
-  pinMode(PinGo, OUTPUT);
-  pinMode(PinError, INPUT);
-  
-  digitalWrite(PinGo, HIGH);
-}
-
 void Motorola::start()
 {
   cli();
-  
-  m_currentMsgNumber = 0;
+
+  digitalWrite(PinGo, HIGH);
+  pinMode(PinGo, OUTPUT);
+
+  digitalWrite(PinData, HIGH);
+  pinMode(PinData, OUTPUT);
+
+  pinMode(PinError, INPUT);
+  attachInterrupt(digitalPinToInterrupt(PinError), &onErrorPin, RISING);
+
+  s_msgEnabled = 0;
+  s_msgSpeed = 0;
+  s_msgOneShot = 0;
+  s_currentMsgNumber = 0;
   loadNextMessage();
-  m_state = false;
-  m_bitCounter = 0;
-  
+  s_state = false;
+  s_bitCounter = 0;
+
   TCCR1A = 0b11000010;
   TCCR1B = 0b00011010; // non inverted fast PWM on OC1A (D9), fT1 = fCPU / 8, TOP = ICR1
   ICR1 = 416;
@@ -109,7 +114,7 @@ void Motorola::start()
   TIMSK1 |= (1 << TOIE1); // Enable Timer 1 Overflow Interrupt
   TIFR1 = 0;
   TCNT1  = 0;
-  m_running = true;
+  s_running = true;
 
   sei();
   digitalWrite(PinGo, LOW);
@@ -122,7 +127,7 @@ void Motorola::setMessage(uint8_t n, Message message)
 
   if(n < MessageBufferSize)
   {
-    m_msgBuffer[n] = message;
+    s_msgBuffer[n] = message;
   }
 
   SREG = SaveSREG; // restore interrupt flag
@@ -131,7 +136,7 @@ Motorola::Message Motorola::getMessage(uint8_t n)
 {
   if(n < MessageBufferSize)
   {
-    return m_msgBuffer[n];
+    return s_msgBuffer[n];
   }
   return IdleMessage;
 }
@@ -140,7 +145,7 @@ void Motorola::enableMessage(uint8_t n)
   uint8_t SaveSREG = SREG;
   cli(); // clear interrupt flag
 
-  m_msgEnabled |= (0x1 << n);
+  s_msgEnabled |= (0x1 << n);
 
   SREG = SaveSREG; // restore interrupt flag
 }
@@ -149,14 +154,14 @@ void Motorola::disableMessage(uint8_t n)
   uint8_t SaveSREG = SREG;
   cli(); // clear interrupt flag
 
-  m_msgEnabled &= ~(0x1 << n);
+  s_msgEnabled &= ~(0x1 << n);
 
   SREG = SaveSREG; // restore interrupt flag
 }
 
 boolean Motorola::messageEnabled(uint8_t n)
 {
-  return m_msgEnabled & (0x1 << n);
+  return s_msgEnabled & (0x1 << n);
 }
 
 void Motorola::setMessageSpeed(uint8_t n, boolean speed)
@@ -166,11 +171,11 @@ void Motorola::setMessageSpeed(uint8_t n, boolean speed)
 
   if(speed)
   {
-    m_msgSpeed |= (0x1 << n);
+    s_msgSpeed |= (0x1 << n);
   }
   else
   {
-    m_msgSpeed &= ~(0x1 << n);
+    s_msgSpeed &= ~(0x1 << n);
   }
 
   SREG = SaveSREG; // restore interrupt flag
@@ -183,11 +188,11 @@ void Motorola::setMessageOneShot(uint8_t n, boolean oneShot)
 
   if(oneShot)
   {
-    m_msgOneShot |= (0x1 << n);
+    s_msgOneShot |= (0x1 << n);
   }
   else
   {
-    m_msgOneShot &= ~(0x1 << n);
+    s_msgOneShot &= ~(0x1 << n);
   }
 
   SREG = SaveSREG; // restore interrupt flag
@@ -197,13 +202,13 @@ uint8_t cnt = 0;
 
 void Motorola::onTimerOverflow()
 {
-  if(!m_running)
+  if(!s_running)
     return;
-  
-  ICR1 = m_currentSpeed? 208 : 416;
-  if(m_bitCounter >= BitCountMsg - 1)
+
+  ICR1 = s_currentSpeed? 208 : 416;
+  if(s_bitCounter >= BitCountMsg - 1)
   {
-    if(m_state) //End of Message repetition
+    if(s_state) //End of Message repetition
     {
       ICR1 *= (BitCountWait + 1);
       loadNextMessage();
@@ -212,46 +217,60 @@ void Motorola::onTimerOverflow()
     {
       ICR1 *= (BitCountGap + 1);
     }
-    m_state = !m_state;
-    m_bitCounter = 0;
+    s_state = !s_state;
+    s_bitCounter = 0;
   }
   else
   {
-    ++m_bitCounter;
+    ++s_bitCounter;
   }
-  boolean currentBit = (m_currentMessage >> m_bitCounter) & 0x1;
-  OCR1A = (currentBit? 182 : 26) * (m_currentSpeed? 1 : 2);
+  boolean currentBit = (s_currentMessage >> s_bitCounter) & 0x1;
+  OCR1A = (currentBit? 182 : 26) * (s_currentSpeed? 1 : 2);
 }
 
 void Motorola::onErrorPin()
 {
-  if(!m_running)
+  if(!s_running)
     return;
-  m_running = false;
+  s_running = false;
   digitalWrite(PinGo, HIGH); //switch rail voltage off
 }
 
 void Motorola::loadNextMessage()
 {
-  if(m_msgEnabled)
+  if(s_msgEnabled)
   {
     MessageBufferMask mask;
     do
     {
-      m_currentMsgNumber = (m_currentMsgNumber + 1) % MessageBufferSize;
-      mask = 1 << m_currentMsgNumber;
-    } while(!(m_msgEnabled & mask));
+      s_currentMsgNumber = (s_currentMsgNumber + 1) % MessageBufferSize;
+      mask = 1 << s_currentMsgNumber;
+    } while(!(s_msgEnabled & mask));
 
-    if(m_msgOneShot & mask)
+    if(s_msgOneShot & mask)
     {
-      m_msgEnabled &= ~mask;
+      s_msgEnabled &= ~mask;
     }
-    m_currentMessage = m_msgBuffer[m_currentMsgNumber];
-    m_currentSpeed = m_msgSpeed & mask;
+    s_currentMessage = s_msgBuffer[s_currentMsgNumber];
+    s_currentSpeed = s_msgSpeed & mask;
   }
   else
   {
-    m_currentMessage = IdleMessage;
-    m_currentSpeed = IdleSpeed;
+    s_currentMessage = IdleMessage;
+    s_currentSpeed = IdleSpeed;
   }
 }
+
+Motorola::Message Motorola::s_msgBuffer[Motorola::MessageBufferSize];
+
+Motorola::MessageBufferMask Motorola::s_msgEnabled;
+Motorola::MessageBufferMask Motorola::s_msgSpeed;
+Motorola::MessageBufferMask Motorola::s_msgOneShot;
+
+bool Motorola::s_running = false;
+
+uint8_t Motorola::s_currentMsgNumber;
+bool Motorola::s_state;
+uint8_t Motorola::s_bitCounter;
+Motorola::MessageSpeed Motorola::s_currentSpeed;
+Motorola::Message Motorola::s_currentMessage;
