@@ -3,15 +3,20 @@
 
 Motorola motorola;
 
-const uint8_t address[] = {Motorola::IdleAddress, 1, 3, 65};
-const uint8_t addressCount = 4;
+const uint8_t trainAddress[] = {Motorola::IdleAddress, 1, 3, 65};
+const uint8_t trainAddressCount = 4;
+const uint8_t trainIdleAddressIndex = 0;
 
-constexpr uint8_t SwitchMsgSlot = 7;
+constexpr uint8_t switchMsgSlot = 7;
 
 constexpr uint8_t switchArrayAddress[] = {1, 3};
 constexpr uint8_t switchArrayState[] = {15, 12, 3};
 
 constexpr uint8_t sectionOccupants[4] = {0, 1, 2, 3};
+
+int incomingSerialByte;
+int serialBytes[3];
+int parsedSerialBytes[3];
 
 ISR(TIMER1_OVF_vect)
 {
@@ -21,27 +26,27 @@ ISR(TIMER1_OVF_vect)
 void setSwitchArray(uint8_t decoderAddress, uint8_t states) //first 4 bits: 0 = straight, 1 = diverging
 {
   unsigned long ts;
-  motorola.setMessageSpeed(SwitchMsgSlot, true);
-  motorola.setMessageOneShot(SwitchMsgSlot, true);
+  motorola.setMessageSpeed(switchMsgSlot, true);
+  motorola.setMessageOneShot(switchMsgSlot, true);
   for(int i = 0; i < 4; ++i)
   {
     ts = millis();
-    motorola.setMessage(SwitchMsgSlot, Motorola::switchMessage(decoderAddress, 2 * i + ((states & (0x1 << i))? 1 : 0), true));
-    motorola.enableMessage(SwitchMsgSlot);
-    while((millis()-ts) < 150 || motorola.messageEnabled(SwitchMsgSlot));
+    motorola.setMessage(switchMsgSlot, Motorola::switchMessage(decoderAddress, 2 * i + ((states & (0x1 << i))? 1 : 0), true));
+    motorola.enableMessage(switchMsgSlot);
+    while((millis()-ts) < 150 || motorola.messageEnabled(switchMsgSlot));
     ts = millis();
-    motorola.setMessage(SwitchMsgSlot, Motorola::switchMessage(decoderAddress, 2 * i + ((states & (0x1 << i))? 1 : 0), false));
-    motorola.enableMessage(SwitchMsgSlot);
-    while((millis()-ts) < 50 || motorola.messageEnabled(SwitchMsgSlot));
+    motorola.setMessage(switchMsgSlot, Motorola::switchMessage(decoderAddress, 2 * i + ((states & (0x1 << i))? 1 : 0), false));
+    motorola.enableMessage(switchMsgSlot);
+    while((millis()-ts) < 50 || motorola.messageEnabled(switchMsgSlot));
   }
 }
 
 void msgHandler(CAN::MessageEvent * message)
 {
-  motorola.setMessage(0, Motorola::oldTrainMessage(address[0], true, 0));
-  motorola.setMessage(1, Motorola::oldTrainMessage(address[1], true, 0));
-  motorola.setMessage(2, Motorola::oldTrainMessage(address[2], true, 0));
-  motorola.setMessage(3, Motorola::oldTrainMessage(address[3], true, 0));
+  motorola.setMessage(0, Motorola::oldTrainMessage(trainAddress[0], true, 0));
+  motorola.setMessage(1, Motorola::oldTrainMessage(trainAddress[1], true, 0));
+  motorola.setMessage(2, Motorola::oldTrainMessage(trainAddress[2], true, 0));
+  motorola.setMessage(3, Motorola::oldTrainMessage(trainAddress[3], true, 0));
 
   CAN::StdIdentifier contactAddr = message->stdIdentifier;
   // uint32_t timestamp =
@@ -82,12 +87,71 @@ void errorHandler(CAN::ErrorEvent * error)
   Serial.print("ERROR: 0x"); Serial.println(error->flags, HEX);
 }
 
+void parseSerialInput()
+{
+  // Read 1 serial byte
+  incomingSerialByte = Serial.read();
+  if(incomingSerialByte == -1)
+    return;
+
+  serialBytes[0] = serialBytes[1];
+  serialBytes[1] = serialBytes[2];
+  serialBytes[2] = incomingSerialByte;
+
+  // check that every byte is in [0-9A-F]
+  for(int i=1; i<3; i++)
+  {
+    if(serialBytes[i] >= '0' && serialBytes[i] <= '9')
+      parsedSerialBytes[i] = serialBytes[i] - '0';
+    else if(serialBytes[i] >= 'A' && serialBytes[i] <= 'F')
+      parsedSerialBytes[i] = serialBytes[i] - 'A' + 10;
+    else
+      parsedSerialBytes[i] = -1;
+  }
+
+  if(parsedSerialBytes[1] == -1 || parsedSerialBytes[2] == -1)
+    return;
+
+  if(serialBytes[0] == 'L') // locomotive
+  {
+    long trainNo = parsedSerialBytes[1];
+    long speed = parsedSerialBytes[2];
+
+    // Don't actively set speed for Motorola::IdleAddress
+    if(trainNo == trainIdleAddressIndex)
+      return;
+
+    Serial.print("Zug "); Serial.print(trainNo); Serial.print(": "); Serial.println(speed);
+
+    if(0 <= trainNo && trainNo < trainAddressCount &&
+       0 <= speed && speed < 16)
+    {
+      motorola.setMessage(trainNo, Motorola::oldTrainMessage(trainAddress[(uint8_t)trainNo], true, (uint8_t)speed));
+    }
+  }
+  else if(serialBytes[0] == 'W') // switch
+  {
+    long swaAddr = parsedSerialBytes[1];
+    long state = parsedSerialBytes[2];
+    Serial.print("Weiche "); Serial.print(swaAddr); Serial.print(": "); Serial.println(state);
+
+    if(0 <= state && state < 3)
+    {
+      setSwitchArray(switchArrayAddress[swaAddr], switchArrayState[state]);
+    }
+  }
+}
+
 void setup() {
   motorola.start();
 
-  for(uint8_t i = 0; i < addressCount; ++i)
+  for(uint8_t i = 0; i < trainAddressCount; ++i)
   {
-    motorola.setMessage(i, Motorola::oldTrainMessage(address[i], true, 0));
+    // Don't create a dedicated message slot for the idle message
+    if(i == trainIdleAddressIndex)
+      continue;
+
+    motorola.setMessage(i, Motorola::oldTrainMessage(trainAddress[i], true, 0));
     motorola.setMessageSpeed(i, false);
     motorola.setMessageOneShot(i, false);
     motorola.enableMessage(i);
@@ -102,58 +166,6 @@ void setup() {
   Serial.setTimeout(60000);
 }
 
-int incomingSerialByte;
-int serialBytes[3];
-int parsedSerialBytes[3];
-void parseSerialInput()
-{
-  incomingSerialByte = Serial.read();
-  if(incomingSerialByte == -1)
-    return;
-
-  serialBytes[0] = serialBytes[1];
-  serialBytes[1] = serialBytes[2];
-  serialBytes[2] = incomingSerialByte;
-
-  for(int i=1; i<3; i++)
-  {
-    if(serialBytes[i] >= '0' && serialBytes[i] <= '9')
-      parsedSerialBytes[i] = serialBytes[i] - '0';
-    else if(serialBytes[i] >= 'A' && serialBytes[i] <= 'F')
-      parsedSerialBytes[i] = serialBytes[i] - 'A' + 10;
-    else
-      parsedSerialBytes[i] = -1;
-  }
-
-  if(parsedSerialBytes[1] == -1 || parsedSerialBytes[2] == -1)
-    return;
-
-  if(serialBytes[0] == 'L')
-  {
-    long trainNo = parsedSerialBytes[1];
-    long speed = parsedSerialBytes[2];
-    Serial.print("Zug "); Serial.print(trainNo); Serial.print(": "); Serial.println(speed);
-
-    if(0 <= trainNo && trainNo < addressCount &&
-       0 <= speed && speed < 16)
-    {
-      motorola.setMessage(trainNo, Motorola::oldTrainMessage(address[(uint8_t)trainNo], true, (uint8_t)speed));
-    }
-  }
-  else if(serialBytes[0] == 'W')
-  {
-    long swaAddr = parsedSerialBytes[1];
-    long state = parsedSerialBytes[2];
-    Serial.print("Weiche "); Serial.print(swaAddr); Serial.print(": "); Serial.println(state);
-
-    if(0 <= state && state < 3)
-    {
-      setSwitchArray(switchArrayAddress[swaAddr], switchArrayState[state]);
-    }
-  }
-}
-
 void loop() {
   parseSerialInput();
 }
-
