@@ -18,8 +18,8 @@ constexpr uint8_t pinToContactMap[16] = {0, 1, 2, 3, 4, 5, 6, 7, 11, 10, 9, 8, 1
 uint32_t timestamps[16] = {0}; // last start of track signal
 uint32_t durations[16] = {0}; // last duration of track signal
 uint16_t inputStates = 0; // bit field: input pin X is currently high
-uint32_t debounceIn = 10; // time in milliseconds before input edge H/L is detected
-uint32_t debounceOut = 100; // time in milliseconds before an input edge L/H after an edge H/L is detected
+uint32_t debounceIn = 20; // time in milliseconds before input edge H/L is detected
+uint32_t debounceOut = 20; // time in milliseconds before an input edge L/H after an edge H/L is detected
 
 CAN::StdIdentifier canAddress = 0x300;
 CAN::StdIdentifier canAddressMask = 0x7F0; //take 16 addresses
@@ -109,13 +109,7 @@ void loop()
 
       if((inputStates & contactMask) == 0 && (timeSinceLastFallingEdge > debounceOut))
       {
-        Serial.print(pinNumber);
-        Serial.print(">");
-        Serial.print(contactNumber);
-        Serial.print(" ");
-        Serial.print(now);
-        Serial.print(" ");
-        Serial.println(0);
+        Serial.print(contactNumber); Serial.println(" close");
 
         timestamps[contactNumber] = now;
         inputStates |= contactMask;
@@ -137,13 +131,7 @@ void loop()
       {
         durations[contactNumber] = timeSinceLastRisingEdge;
 
-        Serial.print(pinNumber);
-        Serial.print(">");
-        Serial.print(contactNumber);
-        Serial.print(" ");
-        Serial.print(timestamps[contactNumber]);
-        Serial.print(" ");
-        Serial.println(durations[contactNumber]);
+        Serial.print(contactNumber); Serial.println(" open");
 
         inputStates &= ~contactMask;
 
@@ -153,5 +141,3 @@ void loop()
     }
   }
 }
-
-
