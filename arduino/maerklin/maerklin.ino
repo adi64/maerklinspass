@@ -207,6 +207,96 @@ void msgHandler(const CAN::MessageEvent * message)
   handleSwitchArrayEvent(section, entering);
 }
 
+void operateSwitchArrays()
+{
+
+    for(uint8_t switchArrayNo = 0; switchArrayNo < 2; switchArrayNo++)
+    {
+      if(switchArrayBusy[switchArrayNo])
+        continue;
+
+      if(switchArrayResetNeeded[switchArrayNo])
+      {
+        setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[0]);
+        switchArrayResetNeeded[switchArrayNo] = false;
+        continue;
+      }
+
+      uint8_t nextTrainNo = switchArrayOccupants[switchArrayNo][0];
+      if(nextTrainNo != 0) // is there a train waiting?
+      {
+        // find a free section, if any
+        uint8_t nextSectionBase = switchArrayNo ? 2 : 0;
+        uint8_t freeSection;
+
+        if(sectionOccupants[nextSectionBase] == 0)
+        {
+          // outer ring is free
+          freeSection = nextSectionBase;
+        }
+        else if(sectionOccupants[nextSectionBase+1] == 0)
+        {
+          // inner ring is free
+          freeSection = nextSectionBase+1;
+        }
+        else
+        {
+          // both tracks are occupied
+          continue;
+        }
+
+        // find out on which section the waiting train is standing on
+        uint8_t currentSectionBase = switchArrayNo ? 0 : 2;
+        uint8_t currentSection;
+        if(sectionOccupants[currentSectionBase] == nextTrainNo)
+        {
+          currentSection = currentSectionBase;
+        }
+        else if(sectionOccupants[currentSectionBase+1] == nextTrainNo)
+        {
+          currentSection = currentSectionBase+1;
+        }
+        else
+        {
+            Serial.print("### ERROR: Train ");
+            Serial.print(nextTrainNo);
+            Serial.print(" is waiting on switch array ");
+            Serial.print(switchArrayNo);
+            Serial.print(" but is neither on section ");
+            Serial.print(currentSectionBase);
+            Serial.print(" nor ");
+            Serial.println(currentSectionBase+1);
+            return;
+        }
+
+        // set switch array busy
+        switchArrayBusy[switchArrayNo] = true;
+
+        // operate switch array, if neccessary
+        if((currentSection & 0x1) != (freeSection & 0x1))
+        {
+          // train needs to switch tracks
+          if(currentSection & 0x1)
+          {
+            // switch in->out
+            setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[1]);
+          }
+          else
+          {
+            // switch out->in
+            setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[2]);
+          }
+          // note that no action has to be taken for in->in or out->out
+          // since the switch array is always reset to this state
+        }
+
+        // start train
+        Motorola::setMessage(nextTrainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)nextTrainNo], true, (uint8_t)8));
+      }
+
+    }
+}
+
 void errorHandler(const CAN::ErrorEvent * error)
 {
   Serial.print("ERROR: 0x"); Serial.println(error->flags, HEX);
@@ -293,87 +383,4 @@ void setup() {
 
 void loop() {
   parseSerialInput();
-
-  for(uint8_t switchArrayNo = 0; switchArrayNo < 2; switchArrayNo++)
-  {
-    if(switchArrayBusy[switchArrayNo])
-      continue;
-
-    if(switchArrayResetNeeded[switchArrayNo])
-    {
-      setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[0]);
-      switchArrayResetNeeded[switchArrayNo] = false;
-      continue;
-    }
-
-    uint8_t nextTrainNo = switchArrayOccupants[switchArrayNo][0];
-    if(nextTrainNo != 0) // is there a train waiting?
-    {
-      // find a free section, if any
-      uint8_t nextSectionBase = switchArrayNo ? 2 : 0;
-      uint8_t freeSection;
-
-      if(sectionOccupants[nextSectionBase] == 0)
-      {
-        // outer ring is free
-        freeSection = nextSectionBase;
-      }
-      else if(sectionOccupants[nextSectionBase+1] == 0)
-      {
-        // inner ring is free
-        freeSection = nextSectionBase+1;
-      }
-      else
-      {
-        // both tracks are occupied
-        continue;
-      }
-
-      // find out on which section the waiting train is standing on
-      uint8_t currentSectionBase = switchArrayNo ? 0 : 2;
-      uint8_t currentSection;
-      if(sectionOccupants[currentSectionBase] == nextTrainNo)
-      {
-        currentSection = currentSectionBase;
-      }
-      else if(sectionOccupants[currentSectionBase+1] == nextTrainNo)
-      {
-        currentSection = currentSectionBase+1;
-      }
-      else
-      {
-          Serial.print("### ERROR: Train ");
-          Serial.print(nextTrainNo);
-          Serial.print(" is waiting on switch array ");
-          Serial.print(switchArrayNo);
-          Serial.print(" but is neither on section ");
-          Serial.print(currentSectionBase);
-          Serial.print(" nor ");
-          Serial.println(currentSectionBase+1);
-          return;
-      }
-
-      // operate switch array, if neccessary
-      if((currentSection & 0x1) != (freeSection & 0x1))
-      {
-        // train needs to switch tracks
-        if(currentSection & 0x1)
-        {
-          // switch in->out
-          setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[1]);
-        }
-        else
-        {
-          // switch out->in
-          setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[2]);
-        }
-        // note that no action has to be taken for in->in or out->out
-        // since the switch array is always reset to this state
-      }
-
-      // start train
-      Motorola::setMessage(nextTrainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)nextTrainNo], true, (uint8_t)8));
-    }
-
-  }
 }
