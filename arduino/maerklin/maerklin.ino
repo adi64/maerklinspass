@@ -22,11 +22,6 @@ int incomingSerialByte;
 int serialBytes[3] = {0};
 int parsedSerialBytes[3] = {-1};
 
-ISR(TIMER1_OVF_vect)
-{
-  motorola.onTimerOverflow();
-}
-
 void setSwitchArray(uint8_t decoderAddress, uint8_t states) //first 4 bits: 0 = straight, 1 = diverging
 {
   unsigned long ts;
@@ -58,7 +53,7 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     }
 
     // stop train
-    motorola.setMessage(trainNo, Motorola::oldTrainMessage(trainAddressMap[trainNo], true, 0));
+    Motorola::setMessage(trainNo, Motorola::oldTrainMessage(trainAddressMap[trainNo], true, 0));
 
     // Put train in switch array waiting list
     uint8_t switchArrayNo = (section & 0b10) ? 1 : 0; // section 0,1 -> SA0; section 2,3 -> SA1
@@ -151,12 +146,12 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
   }
 }
 
-void msgHandler(CAN::MessageEvent * message)
+void msgHandler(const CAN::MessageEvent * message)
 {
-  //Motorola::setMessage(0, Motorola::oldTrainMessage(trainAddress[0], true, 0));
-  //Motorola::setMessage(1, Motorola::oldTrainMessage(trainAddress[1], true, 0));
-  //Motorola::setMessage(2, Motorola::oldTrainMessage(trainAddress[2], true, 0));
-  //Motorola::setMessage(3, Motorola::oldTrainMessage(trainAddress[3], true, 0));
+  //Motorola::setMessage(0, Motorola::oldTrainMessage(trainAddressMap[0], true, 0));
+  //Motorola::setMessage(1, Motorola::oldTrainMessage(trainAddressMap[1], true, 0));
+  //Motorola::setMessage(2, Motorola::oldTrainMessage(trainAddressMap[2], true, 0));
+  //Motorola::setMessage(3, Motorola::oldTrainMessage(trainAddressMap[3], true, 0));
 
   CAN::StdIdentifier contactAddr = message->stdIdentifier;
   // uint32_t timestamp =
@@ -256,7 +251,7 @@ void parseSerialInput()
     if(0 <= trainNo && trainNo < trainAddressCount &&
        0 <= speed && speed < 16)
     {
-      Motorola::setMessage(trainNo, Motorola::oldTrainMessage(trainAddress[(uint8_t)trainNo], true, (uint8_t)speed));
+      Motorola::setMessage(trainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)trainNo], true, (uint8_t)speed));
     }
   }
   else if(serialBytes[0] == 'W') // switch
@@ -281,7 +276,7 @@ void setup() {
     if(i == trainIdleAddressIndex)
       continue;
 
-    Motorola::setMessage(i, Motorola::oldTrainMessage(trainAddress[i], true, 0));
+    Motorola::setMessage(i, Motorola::oldTrainMessage(trainAddressMap[i], true, 0));
     Motorola::setMessageSpeed(i, false);
     Motorola::setMessageOneShot(i, false);
     Motorola::enableMessage(i);
@@ -377,7 +372,7 @@ void loop() {
       }
 
       // start train
-      motorola.setMessage(nextTrainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)nextTrainNo], true, (uint8_t)8));
+      Motorola::setMessage(nextTrainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)nextTrainNo], true, (uint8_t)8));
     }
 
   }
