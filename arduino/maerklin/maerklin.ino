@@ -379,6 +379,15 @@ void parseSerialInput()
   if(incomingSerialByte == -1)
     return;
 
+  if(incomingSerialByte == 'H')
+  {
+    Serial.println("stopping all trains");
+    for(uint8_t trainNo = 0; trainNo < trainAddressCount; trainNo++)
+    {
+      Motorola::setMessage(trainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)trainNo], true, (uint8_t)0));
+    }
+  }
+
   serialBytes[0] = serialBytes[1];
   serialBytes[1] = serialBytes[2];
   serialBytes[2] = incomingSerialByte;
@@ -411,6 +420,7 @@ void parseSerialInput()
     if(0 <= trainNo && trainNo < trainAddressCount &&
        0 <= speed && speed < 16)
     {
+      trainTargetSpeedMap[trainNo] = speed;
       Motorola::setMessage(trainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)trainNo], true, (uint8_t)speed));
     }
   }
