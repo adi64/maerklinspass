@@ -23,6 +23,8 @@ public:
   static constexpr uint8_t BitCountGap = 6;
   static constexpr uint8_t BitCountWait = 22;
 
+  //TODO newTrainMessageFunction()
+  //TODO newTrainMessageDirection()
   static Message oldTrainMessage(uint8_t address, bool function, uint8_t speedLevel);
   static Message switchMessage(uint8_t decoderAddress, uint8_t switchAddress, bool state);
 

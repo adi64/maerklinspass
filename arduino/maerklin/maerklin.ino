@@ -1,6 +1,43 @@
 #include "can.h"
 #include "motorola.h"
 
+/*
+Train Controller Demo
+^^^^^^^^^^^^^^^^^^^^^
+
+This program controls the movement of 3 trains on 4 track segments (see track layout below)
+ensuring that at most one train is on a particular segment.
+The current position of a train is tracked by monitoring the segment borders.
+Each passing train generates an event on the CAN bus. The event ID for each segment border
+is marked on the track layout next to the respective parenthesis in hexadecimal format. (e.g. 3F8)
+
+Track segments can only be crossed in one direction; all trains move counter-clockwise.
+There are 2 switch arrays (SA0 and SA1) to connect the track segments.
+Both trains and track segments have numbers starting at 0 (each physical train
+or track segment has a label with its number attached) and after a controller reset
+each train is expected to occupy the track segment of the same number.
+
+track layout:
+      ____<T2_____
+     /  __<T3___  \
+    |  /        \  |
+ 3F8) |          | )3F6
+    | )3FA    3F4) |
+    |\|          |/|
+    | |SA1    SA0| |
+    |/|          |\|
+    | )3FC    3F2) |
+ 3FE) |          | )3F0
+    |  \___T1>__/  |
+     \_____T0>____/
+--------------------
+
+
+
+Authors: Adrian Holfter, Lukas Wenzel
+*/
+
+
 const uint8_t trainAddressMap[] = {Motorola::IdleAddress, 1, 3, 65};
 const uint8_t trainAddressCount = 4;
 const uint8_t trainIdleAddressIndex = 0;
