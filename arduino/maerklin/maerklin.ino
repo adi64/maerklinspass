@@ -34,7 +34,30 @@ track layout:
      \_____T0>____/
 --------------------
 
+What this code does:
 
+Upon startup, all trains are set to their "default" speed defined in this file.
+When a train passes a segment border, an event is generated and transmitted via CAN.
+This CAN message / event contains the information which border was crossed (e.g. 3F8).
+
+Note that every "train detector switch" emits events with different IDs for forward and backward activation.
+Since trains are only going counter-clockwise in this scenario, we only listen for events important to us.
+
+When a CAN message is received, msgHandler is called and determines the corresponding track segment:
+* If the train is entering a switch array, it's the segment the train is coming from.
+* If the train is leaving a switch array, it's the segment the train is going to.
+
+Then, handleSwitchArrayEvent is called with this information.
+* If the train is entering a switch array, it's stopped immediately.
+  The train is then added to the queue of trains waiting to cross this switch array.
+  Note that the train is still marked as occupying the segment that it came from.
+* If the train is leaving a switch array, it is removed from the array's waiting queue.
+  The track segment ahead is then marked as occupied with that train.
+  The previous segment is marked as clear.
+  The switch array is marked as idle but in need of a reset (to a neutral position).
+
+## TODO operateSwitchArrays
+## TODO parseSerialInput
 
 Authors: Adrian Holfter, Lukas Wenzel
 */
