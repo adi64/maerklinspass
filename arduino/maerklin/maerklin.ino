@@ -94,16 +94,16 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     uint8_t trainNo = sectionOccupants[section];
     if(trainNo == 0 || trainNo > trainAddressCount)
     {
-      Serial << "### ERROR: There shouldn't be a train on section " << section << endl;
+      Serial << F("### ERROR: There shouldn't be a train on section ") << section << endl;
       return;
     }
 
     // Put train in switch array waiting list
     uint8_t switchArrayNo = (section & 0b10) ? 1 : 0; // section 0,1 -> SA0; section 2,3 -> SA1
-    Serial << "Train " << trainNo << " is entering SA" << switchArrayNo << endl;
+    Serial << F("Train ") << trainNo << F(" is entering SA") << switchArrayNo << endl;
     if(switchArrayOccupants[switchArrayNo][0] == trainNo || switchArrayOccupants[switchArrayNo][1] == trainNo)
     {
-      Serial << "### ERROR: Train " << trainNo << " is already in queue for SA" << switchArrayNo << endl;
+      Serial << F("### ERROR: Train ") << trainNo << F(" is already in queue for SA") << switchArrayNo << endl;
       return;
     }
     if(switchArrayOccupants[switchArrayNo][0] == 0)
@@ -116,14 +116,14 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     }
     else
     {
-      Serial << "### ERROR: Switch Array " << switchArrayNo << " is already occupied on both tracks" << endl;
+      Serial << F("### ERROR: Switch Array ") << switchArrayNo << F(" is already occupied on both tracks") << endl;
       return;
     }
 
     // stop train
     Motorola::setMessage(trainNo, Motorola::oldTrainMessage(trainAddressMap[trainNo], true, 0));
 
-    Serial << "SA" << switchArrayNo << " queue: " << switchArrayOccupants[switchArrayNo][0] << " "
+    Serial << F("SA") << switchArrayNo << F(" queue: ") << switchArrayOccupants[switchArrayNo][0] << F(" ")
                                                   << switchArrayOccupants[switchArrayNo][1] << endl;
 
   }
@@ -132,19 +132,19 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     uint8_t switchArrayNo = (section & 0b10) ? 0 : 1; // SA0 -> section 2,3; SA1 -> section 0,1
     uint8_t trainNo = switchArrayOccupants[switchArrayNo][0]; // first train in SA queue
 
-    Serial << "Train " << trainNo << " is leaving SA" << switchArrayNo << endl;
+    Serial << F("Train ") << trainNo << F(" is leaving SA") << switchArrayNo << endl;
 
     // sanity check train number
     if(trainNo == 0 || trainNo > trainAddressCount)
     {
-      Serial << "### ERROR: Switch array " << switchArrayNo << " was not occupied!" << endl;
+      Serial << F("### ERROR: Switch array ") << switchArrayNo << F(" was not occupied!") << endl;
       return;
     }
 
     // sanity check section occupants
     if(sectionOccupants[section] != 0)
     {
-      Serial << "### ERROR: Section " << section << " is already occupied by train " << sectionOccupants[section] << endl;
+      Serial << F("### ERROR: Section ") << section << F(" is already occupied by train ") << sectionOccupants[section] << endl;
       return;
     }
 
@@ -161,7 +161,7 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     // sanity check switch array business
     if(!switchArrayBusy[switchArrayNo])
     {
-      Serial << "### ERROR: Switch array " << switchArrayNo << " was not marked busy but a train just left it!" << endl;
+      Serial << F("### ERROR: Switch array ") << switchArrayNo << F(" was not marked busy but a train just left it!") << endl;
       return;
     }
 
@@ -170,19 +170,19 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     // sanity check switch array reset requests
     if(switchArrayResetNeeded[switchArrayNo])
     {
-      Serial << "### ERROR: Switch array " << switchArrayNo << " still needs to be reset but a train just left it!" << endl;
+      Serial << F("### ERROR: Switch array ") << switchArrayNo << F(" still needs to be reset but a train just left it!") << endl;
       return;
     }
 
     // request a reset of switch array
     switchArrayResetNeeded[switchArrayNo] = true;
 
-    Serial << "schedule restart of SA" << switchArrayNo << endl;
+    Serial << F("schedule restart of SA") << switchArrayNo << endl;
 
     // sanity check switch array queue
     if(switchArrayOccupants[switchArrayNo][0] != trainNo)
     {
-      Serial << "### ERROR: Train " << trainNo << " was not first in queue of switch array " << switchArrayNo << endl;
+      Serial << F("### ERROR: Train ") << trainNo << F(" was not first in queue of switch array ") << switchArrayNo << endl;
       return;
     }
 
@@ -190,12 +190,12 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     switchArrayOccupants[switchArrayNo][0] = switchArrayOccupants[switchArrayNo][1];
     switchArrayOccupants[switchArrayNo][1] = 0;
 
-    Serial << "SA" << switchArrayNo << " queue: " << switchArrayOccupants[switchArrayNo][0] << " " << switchArrayOccupants[switchArrayNo][1] << endl;
+    Serial << F("SA") << switchArrayNo << F(" queue: ") << switchArrayOccupants[switchArrayNo][0] << F(" ") << switchArrayOccupants[switchArrayNo][1] << endl;
 
     // mark new section as occupied
     sectionOccupants[section] = trainNo;
 
-    Serial << "Occupy section " << section << endl;
+    Serial << F("Occupy section ") << section << endl;
   }
 }
 
@@ -203,7 +203,6 @@ void msgHandler(const CAN::MessageEvent * message)
 {
 
   CAN::StdIdentifier contactAddr = message->stdIdentifier;
-  uint32_t timestamp = decodeLong(message->content);
   uint32_t duration = decodeLong(message->content + 4);
 
   if((contactAddr & 0x1) != 0)
@@ -305,14 +304,14 @@ void operateSwitchArrays()
         }
         else
         {
-            Serial << "### ERROR: Train " << nextTrainNo << " is waiting on switch array " << switchArrayNo << " but is neither on section " << currentSectionBase << " nor " << currentSectionBase+1 << endl;
+            Serial << F("### ERROR: Train ") << nextTrainNo << F(" is waiting on switch array ") << switchArrayNo << F(" but is neither on section ") << currentSectionBase << F(" nor ") << currentSectionBase+1 << endl;
             return;
         }
 
         // set switch array busy
         switchArrayBusy[switchArrayNo] = true;
 
-        Serial << "SA" << switchArrayNo << " is busy" << endl;
+        Serial << F("SA") << switchArrayNo << F(" is busy") << endl;
 
         // operate switch array, if neccessary
         if((currentSection & 0x1) != (freeSection & 0x1))
@@ -335,7 +334,7 @@ void operateSwitchArrays()
         // start train
         Motorola::setMessage(nextTrainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)nextTrainNo], true, (uint8_t)trainTargetSpeedMap[nextTrainNo]));
 
-        Serial << "Starting train " << nextTrainNo << " from section " << currentSection << " to " << freeSection << endl;
+        Serial << F("Starting train ") << nextTrainNo << F(" from section ") << currentSection << F(" to ") << freeSection << endl;
       }
 
     }
@@ -343,7 +342,7 @@ void operateSwitchArrays()
 
 void errorHandler(const CAN::ErrorEvent * error)
 {
-  Serial << "ERROR: 0x" << _HEX(error->flags) << endl;
+  Serial << F("ERROR: 0x") << _HEX(error->flags) << endl;
 }
 
 void parseSerialInput()
@@ -355,7 +354,7 @@ void parseSerialInput()
 
   if(incomingSerialByte == 'H')
   {
-    Serial << "stopping all trains" << endl;
+    Serial << F("stopping all trains") << endl;
     for(uint8_t trainNo = 0; trainNo < trainAddressCount; trainNo++)
     {
       Motorola::setMessage(trainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)trainNo], true, (uint8_t)0));
@@ -389,7 +388,7 @@ void parseSerialInput()
     if(trainNo == trainIdleAddressIndex)
       return;
 
-    Serial << "Zug " << trainNo << ": " << speed << endl;
+    Serial << F("Zug ") << trainNo << F(": ") << speed << endl;
 
     if(0 <= trainNo && trainNo < trainAddressCount &&
        0 <= speed && speed < 16)
@@ -402,7 +401,7 @@ void parseSerialInput()
   {
     long swaAddr = parsedSerialBytes[1];
     long state = parsedSerialBytes[2];
-    Serial << "Weiche " << swaAddr << ": " << state << endl;
+    Serial << F("Weiche ") << swaAddr << F(": ") << state << endl;
 
     if(0 <= state && state < 3)
     {
