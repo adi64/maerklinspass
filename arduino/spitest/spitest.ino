@@ -3,33 +3,34 @@
 
 /* SPI Test
  * Allows manual interaction with an SPI interface via the serial link for testing purposes.
- * 
- * Simply enter up to 4 hexadecimal Bytes and a newline and see the response.
+ *
+ * Simply enter up to MAX_BYTE_COUNT hexadecimal Bytes and a newline and see the response.
  */
 
 
-const int PIN_nCS = 10;
+constexpr int PIN_nCS = 10;
+constexpr int MAX_BYTE_COUNT = 256;
 
 SPISettings SPI_CONF(10000000, MSBFIRST, SPI_MODE0);
 
 void setup() {
   Serial.begin(9600);
-  
+
   SPI.begin();
-  
+
   pinMode(PIN_nCS, OUTPUT);
   digitalWrite(PIN_nCS, HIGH);
 }
 
 void loop() {
-  byte command[130];
+  byte command[MAX_BYTE_COUNT];
   int byteCount;
   while (1) {
-    byteCount = readCommand(command, 130);
+    byteCount = readCommand(command, MAX_BYTE_COUNT);
     if (byteCount <= 0) break;
     performCommand(command, byteCount);
   }
-  
+
   Serial.println(F("No input received. Terminating."));
   while(1);
 }

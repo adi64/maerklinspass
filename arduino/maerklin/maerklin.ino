@@ -48,7 +48,9 @@ uint8_t trainTargetSpeedMap[] = {0, 8, 6, 8};
 constexpr uint8_t switchMsgSlot = 7;
 
 constexpr uint8_t switchArrayAddress[] = {1, 3};
-constexpr uint8_t switchArrayStateMap[] = {15, 3, 12}; // straight, in->out, out->in
+constexpr uint8_t SWITCH_ARRAY_STRAIGHT = 0xF;
+constexpr uint8_t SWITCH_ARRAY_IN2OUT = 0x3;
+constexpr uint8_t SWITCH_ARRAY_OUT2IN = 0xC;
 
 uint8_t sectionOccupants[4] = {0, 1, 2, 3}; // preloaded with initial state
 uint8_t switchArrayOccupants[2][2] = {0}; // 2 switchArrays, max. 2 trains waiting per array
@@ -260,7 +262,7 @@ void operateSwitchArrays()
     {
       if(switchArrayResetNeeded[switchArrayNo])
       {
-        setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[0]);
+        setSwitchArray(switchArrayAddress[switchArrayNo], SWITCH_ARRAY_STRAIGHT);
         switchArrayResetNeeded[switchArrayNo] = false;
         continue;
       }
@@ -320,12 +322,12 @@ void operateSwitchArrays()
           if(currentSection & 0x1)
           {
             // switch in->out
-            setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[1]);
+            setSwitchArray(switchArrayAddress[switchArrayNo], SWITCH_ARRAY_IN2OUT);
           }
           else
           {
             // switch out->in
-            setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[2]);
+            setSwitchArray(switchArrayAddress[switchArrayNo], SWITCH_ARRAY_OUT2IN);
           }
           // note that no action has to be taken for in->in or out->out
           // since the switch array is always reset to this state
@@ -400,13 +402,21 @@ void parseSerialInput()
   else if(serialBytes[0] == 'W') // switch
   {
     long swaAddr = parsedSerialBytes[1];
-    long state = parsedSerialBytes[2];
-    Serial << F("Weiche ") << swaAddr << F(": ") << state << endl;
-
-    if(0 <= state && state < 3)
+    long state = 0;
+    switch(parsedSerialBytes[2])
     {
-      setSwitchArray(switchArrayAddress[swaAddr], switchArrayStateMap[state]);
+        case 1:
+            state = SWITCH_ARRAY_IN2OUT;
+            break;
+        case 2:
+            state = SWITCH_ARRAY_OUT2IN;
+            break;
+        case 0:
+        default:
+            state = SWITCH_ARRAY_STRAIGHT;
     }
+    Serial << F("Weiche ") << swaAddr << F(": ") << state << endl;
+    setSwitchArray(switchArrayAddress[swaAddr], state);
   }
 }
 
@@ -416,7 +426,7 @@ void setup() {
   // reset switch arrays
   for(uint8_t switchArrayNo = 0; switchArrayNo < 2; switchArrayNo++)
   {
-    setSwitchArray(switchArrayAddress[switchArrayNo], switchArrayStateMap[0]);
+    setSwitchArray(switchArrayAddress[switchArrayNo], SWITCH_ARRAY_STRAIGHT);
   }
 
   for(uint8_t i = 0; i < trainAddressCount; ++i)

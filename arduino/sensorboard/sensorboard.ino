@@ -28,8 +28,8 @@ void encodeLong(const uint32_t & value, uint8_t * buffer)
 {
   buffer[0] = (uint8_t) (value & 0x000000FF);
   buffer[1] = (uint8_t)((value & 0x0000FF00) >>  8);
-  buffer[2] = (uint8_t)((value & 0x0000FF00) >> 16);
-  buffer[3] = (uint8_t)((value & 0x0000FF00) >> 24);
+  buffer[2] = (uint8_t)((value & 0x00FF0000) >> 16);
+  buffer[3] = (uint8_t)((value & 0xFF000000) >> 24);
 }
 
 void send(uint8_t pin, uint32_t timestamp, uint32_t duration)
