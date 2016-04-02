@@ -11,7 +11,7 @@ This program controls the movement of 3 trains on 4 track segments (see track la
 ensuring that at most one train is on a particular segment.
 The current position of a train is tracked by monitoring the segment borders.
 Each passing train generates an event on the CAN bus. The event ID for each segment border
-is marked on the track layout next to the respective parenthesis in hexadecimal format. (e.g. 3F8)
+is marked on the track layout next to the respective parenthesis in hexadecimal format. (e.g. 308)
 
 Track segments can only be crossed in one direction; all trains move counter-clockwise.
 There are 2 switch arrays (SA0 and SA1) to connect the track segments.
@@ -23,13 +23,13 @@ track layout:
       ____<T2_____
      /  __<T3___  \
     |  /        \  |
- 3F8) |          | )3F6
-    | )3FA    3F4) |
+ 308) |          | )306
+    | )30A    304) |
     |\|          |/|
     | |SA1    SA0| |
     |/|          |\|
-    | )3FC    3F2) |
- 3FE) |          | )3F0
+    | )30C    302) |
+ 30E) |          | )300
     |  \___T1>__/  |
      \_____T0>____/
 --------------------
@@ -38,7 +38,7 @@ What this code does:
 
 Upon startup, all trains are set to their "default" speed defined in this file.
 When a train passes a segment border, an event is generated and transmitted via CAN.
-This CAN message / event contains the information which border was crossed (e.g. 3F8).
+This CAN message / event contains the information which border was crossed (e.g. 308).
 
 Note that every "train detector switch" emits events with different IDs for forward and backward activation.
 Since trains are only going counter-clockwise in this scenario, we only listen for events important to us.
