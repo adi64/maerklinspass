@@ -132,6 +132,15 @@ uint32_t decodeLong(const uint8_t * encoded)
          ((uint32_t)encoded[3]) << 24;
 }
 
+void stopAllTrains()
+{
+  Serial << F("stopping all trains") << endl;
+  for(uint8_t trainNo = 0; trainNo < trainAddressCount; trainNo++)
+  {
+    Motorola::setMessage(trainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)trainNo], true, (uint8_t)0));
+  }
+}
+
 // A train is entering or leaving a switch array - take corresponding action
 void handleSwitchArrayEvent(uint8_t section, bool entering)
 {
@@ -141,6 +150,7 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     if(trainNo == 0 || trainNo > trainAddressCount)
     {
       Serial << F("### ERROR: There shouldn't be a train on section ") << section << endl;
+	  stopAllTrains();
       return;
     }
 
@@ -149,7 +159,7 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     Serial << F("Train ") << trainNo << F(" is entering SA") << switchArrayNo << endl;
     if(switchArrayOccupants[switchArrayNo][0] == trainNo || switchArrayOccupants[switchArrayNo][1] == trainNo)
     {
-      Serial << F("### ERROR: Train ") << trainNo << F(" is already in queue for SA") << switchArrayNo << endl;
+      Serial << F("### WARNING: Train ") << trainNo << F(" is already in queue for SA") << switchArrayNo << endl;
       return;
     }
     if(switchArrayOccupants[switchArrayNo][0] == 0)
@@ -163,6 +173,7 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     else
     {
       Serial << F("### ERROR: Switch Array ") << switchArrayNo << F(" is already occupied on both tracks") << endl;
+	  stopAllTrains();
       return;
     }
 
@@ -184,13 +195,24 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     if(trainNo == 0 || trainNo > trainAddressCount)
     {
       Serial << F("### ERROR: Switch array ") << switchArrayNo << F(" was not occupied!") << endl;
+	  stopAllTrains();
       return;
     }
 
     // sanity check section occupants
     if(sectionOccupants[section] != 0)
     {
-      Serial << F("### ERROR: Section ") << section << F(" is already occupied by train ") << sectionOccupants[section] << endl;
+	  if(sectionOccupants[section] == trainNo)
+	  {
+		// probably just a debounce problem
+		Serial << F("### WARNING: Section ") << section << F(" is already occupied by train ") << sectionOccupants[section] << endl;
+	  }
+	  else
+	  {
+		// security violation!
+		Serial << F("### ERROR: Section ") << section << F(" is already occupied by train ") << sectionOccupants[section] << endl;
+		stopAllTrains();
+	  }
       return;
     }
 
@@ -208,6 +230,7 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     if(!switchArrayBusy[switchArrayNo])
     {
       Serial << F("### ERROR: Switch array ") << switchArrayNo << F(" was not marked busy but a train just left it!") << endl;
+	  stopAllTrains();
       return;
     }
 
@@ -217,6 +240,7 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     if(switchArrayResetNeeded[switchArrayNo])
     {
       Serial << F("### ERROR: Switch array ") << switchArrayNo << F(" still needs to be reset but a train just left it!") << endl;
+	  stopAllTrains();
       return;
     }
 
@@ -224,13 +248,6 @@ void handleSwitchArrayEvent(uint8_t section, bool entering)
     switchArrayResetNeeded[switchArrayNo] = true;
 
     Serial << F("schedule restart of SA") << switchArrayNo << endl;
-
-    // sanity check switch array queue
-    if(switchArrayOccupants[switchArrayNo][0] != trainNo)
-    {
-      Serial << F("### ERROR: Train ") << trainNo << F(" was not first in queue of switch array ") << switchArrayNo << endl;
-      return;
-    }
 
     // cycle switch array queue
     switchArrayOccupants[switchArrayNo][0] = switchArrayOccupants[switchArrayNo][1];
@@ -352,6 +369,7 @@ void operateSwitchArrays()
         else
         {
             Serial << F("### ERROR: Train ") << nextTrainNo << F(" is waiting on switch array ") << switchArrayNo << F(" but is neither on section ") << currentSectionBase << F(" nor ") << currentSectionBase+1 << endl;
+			stopAllTrains();
             return;
         }
 
@@ -400,11 +418,7 @@ void parseSerialInput()
 
   if(incomingSerialByte == 'H')
   {
-    Serial << F("stopping all trains") << endl;
-    for(uint8_t trainNo = 0; trainNo < trainAddressCount; trainNo++)
-    {
-      Motorola::setMessage(trainNo, Motorola::oldTrainMessage(trainAddressMap[(uint8_t)trainNo], true, (uint8_t)0));
-    }
+	stopAllTrains();
   }
 
   // barrel shift incoming bytes
