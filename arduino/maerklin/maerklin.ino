@@ -86,7 +86,7 @@ Authors: Adrian Holfter, Lukas Wenzel
 const uint8_t trainAddressMap[] = {Motorola::IdleAddress, 1, 3, 65};
 const uint8_t trainAddressCount = 4;
 const uint8_t trainIdleAddressIndex = 0;
-uint8_t trainTargetSpeedMap[] = {0, 8, 6, 8};
+uint8_t trainTargetSpeedMap[] = {0, 8, 6, 8}; // default speeds of trains - can be updated at runtime
 
 constexpr uint8_t switchMsgSlot = 7;
 
@@ -132,6 +132,7 @@ uint32_t decodeLong(const uint8_t * encoded)
          ((uint32_t)encoded[3]) << 24;
 }
 
+// A train is entering or leaving a switch array - take corresponding action
 void handleSwitchArrayEvent(uint8_t section, bool entering)
 {
   if(entering) // train is entering switch array
@@ -302,7 +303,6 @@ void msgHandler(const CAN::MessageEvent * message)
 
 void operateSwitchArrays()
 {
-
     for(uint8_t switchArrayNo = 0; switchArrayNo < 2; switchArrayNo++)
     {
       if(switchArrayResetNeeded[switchArrayNo])
@@ -383,7 +383,6 @@ void operateSwitchArrays()
 
         Serial << F("Starting train ") << nextTrainNo << F(" from section ") << currentSection << F(" to ") << freeSection << endl;
       }
-
     }
 }
 
@@ -408,6 +407,7 @@ void parseSerialInput()
     }
   }
 
+  // barrel shift incoming bytes
   serialBytes[0] = serialBytes[1];
   serialBytes[1] = serialBytes[2];
   serialBytes[2] = incomingSerialByte;
@@ -431,7 +431,7 @@ void parseSerialInput()
     long trainNo = parsedSerialBytes[1];
     long speed = parsedSerialBytes[2];
 
-    // Don't actively set speed for Motorola::IdleAddress
+    // Don't set speed for Motorola::IdleAddress
     if(trainNo == trainIdleAddressIndex)
       return;
 
