@@ -56,8 +56,28 @@ Then, handleSwitchArrayEvent is called with this information.
   The previous segment is marked as clear.
   The switch array is marked as idle but in need of a reset (to a neutral position).
 
-## TODO operateSwitchArrays
-## TODO parseSerialInput
+The method operateSwitchArrays is called in a busy loop as long as there are no CAN messages incoming.
+* If a switch array is idle and needs to be reset, it is reset to a neutral position (passthrough).
+* If a switch array is idle and there is a train waiting in its queue and a connected track segment is free,
+  the switch array is marked busy and is set to the appropriate configuration.
+  The train waiting first in queue is then started to cross the switch array.
+  After the train has crossed the switch array, it will hit a detector switch and therefore trigger a new event.
+  
+This code also provides a very basic train control via serial connection.
+Trains can be stopped, started and their speed can be set.
+This way it is possible to add some variety to the scenario.
+Commands are:
+* H
+  Stop all trains.
+* L[array-index][speed]
+  Set the default speed of the locomotive at the given array-index.
+  Example: L0E sets the speed of the first locomotive to 14.
+  Example: L20 stops the third locomotive.
+* W[array-index][configuration]
+  Set the switch array at the given array-index to the given configuration.
+  Example: W10 sets the second switch array to STRAIGHT
+  Example: W11 sets the second switch array to IN2OUT
+  Example: W12 sets the second switch array to OUT2IN
 
 Authors: Adrian Holfter, Lukas Wenzel
 */
