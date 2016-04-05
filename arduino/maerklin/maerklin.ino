@@ -293,6 +293,8 @@ void msgHandler(const CAN::MessageEvent * message)
       section = 0;
       entering = false;
       break;
+	default:
+	  return;
   }
 
   handleSwitchArrayEvent(section, entering);
