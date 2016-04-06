@@ -38,9 +38,10 @@ Commands are:
 
 * `H`: Stop all trains.
 * `L[array-index][speed]`: Set the default speed of the locomotive at the given array-index.
-  * Example: L0E sets the speed of the first locomotive to 14.
-  * Example: L20 stops the third locomotive.
+  * Example: `L0E` sets the speed of the first locomotive to 14.
+  * Example: `L20` stops the third locomotive.
+  * Example: `L21` signals the third locomotive to change its direction. **Stop it first!**
 * `W[array-index][configuration]`: Set the switch array at the given array-index to the given configuration.
-  * Example: W10 sets the second switch array to STRAIGHT
-  * Example: W11 sets the second switch array to IN2OUT
-  * Example: W12 sets the second switch array to OUT2IN
+  * Example: `W10` sets the second switch array to STRAIGHT
+  * Example: `W11` sets the second switch array to IN2OUT
+  * Example: `W12` sets the second switch array to OUT2IN

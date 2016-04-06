@@ -98,6 +98,8 @@ void loop()
     uint32_t now = millis();
     if(digitalRead(inputPin) == LOW) // inverting input logic
     {
+	  // switch was activated
+	  
       uint32_t lastFallingEdge = timestamps[contactNumber] + durations[contactNumber];
       uint32_t timeSinceLastFallingEdge = now - lastFallingEdge;
 
@@ -114,11 +116,14 @@ void loop()
         timestamps[contactNumber] = now;
         inputStates |= contactMask;
 
+		// Send message with timestamp and zero duration
         send(contactNumber, timestamps[contactNumber], 0);
       }
     }
     else
     {
+	  // switch was deactivated
+	  
       uint32_t timeSinceLastRisingEdge = now - timestamps[contactNumber];
 
       // handle timer overflow
