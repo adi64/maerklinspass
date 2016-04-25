@@ -1,4 +1,5 @@
 # Train Controller Demo
+(Also check out the [Wiki](https://github.com/adi64/maerklinspass/wiki)!)
 
 This program controls the movement of 3 trains on 4 track segments (see track layout below)
 ensuring that at most one train is on a particular segment.
