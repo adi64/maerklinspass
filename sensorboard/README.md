@@ -1,4 +1,5 @@
-# Sensorboard
+# Sensor board
+(Also check out the [Wiki](https://github.com/adi64/maerklinspass/wiki), especially the page for the [sensor board](https://github.com/adi64/maerklinspass/wiki/Sensorboard)!)
 
 This program drives the sensorboard.
 The sensorboard monitors the train detector switches by polling for events.
